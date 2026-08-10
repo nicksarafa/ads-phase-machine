@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { GENE_SPACE, type Ad, type GeneKey, type Genes } from "./types";
 import { BRAND, brandBlock } from "./brand";
+import { hookBriefBlock } from "./hooks";
 import type { ContextSource, GeneInsight } from "./types";
 
 /**
@@ -105,6 +106,9 @@ function buildPrompt(input: GenerateInput): string {
   parts.push("");
   parts.push("OPERATOR BRIEF (this is the current prompt, edited live in the UI):");
   parts.push(input.brief.trim());
+
+  parts.push("");
+  parts.push(hookBriefBlock());
 
   const ctx = input.context.filter((c) => c.enabled);
   if (ctx.length) {

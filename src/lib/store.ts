@@ -6,6 +6,7 @@ import {
   type MachinePhase,
   type Settings,
 } from "./types";
+import { COMPETITOR_INTEL } from "./hooks";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const STATE_FILE = path.join(DATA_DIR, "state.json");
@@ -28,18 +29,31 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const DEFAULT_BRIEF = `You are the creative strategist for Light School's paid acquisition on Meta.
 
-Goal: get qualified people to book a workshop seat or start the free lessons.
-The winning ad is the one that makes a specific person think "that's me, and I
-could actually build that."
+Goal: get a decision-maker to book team training, or to start the free lessons
+themselves and bring the team later. The winning ad is the one that makes a
+specific person think "that's my team, and we could actually build that."
+
+Write in English only.
+
+POSITIONING — this is the whole edge:
+The competitor teardown found that everyone in this niche sells a tool, a
+self-paced course, or a career change. Nobody is advertising live, hands-on
+sessions where a team's own problem gets solved in the room. Lead with what
+only a live session can promise: their actual problem, built during the
+session, still running on Monday.
 
 Rules for every ad:
-- Lead with something the reader could build by Wednesday, not with "AI".
-- Use one concrete detail (a real build, a real number, a real objection).
-- Say who it is for inside the ad itself.
+- Lead with something the team could build this week, not with "AI".
+- Use one concrete detail — a real build, a real number, a real objection.
+  Name things. "The $800/month tool a student replaced" beats "save money".
+- Name who it is for inside the ad itself.
 - Primary text is 2-4 short lines. No emoji walls, no hashtag soup.
 - Headline is under 40 characters.
-- Every ad in a batch must attack a different angle. No two variations of the
-  same sentence.`;
+- Use a different proven hook pattern for each ad in the batch, and name the
+  pattern you used in the rationale.
+- Never reuse a competitor's wording. Borrow the structure, write our sentence.
+- Avoid the saturated lines: "it's 2026", "Fortune 100 companies use us",
+  and anything that sounds like an AI-avatar video tool.`;
 
 function emptyState(): AppState {
   return {
@@ -59,6 +73,14 @@ function emptyState(): AppState {
     settings: { ...DEFAULT_SETTINGS },
     brief: DEFAULT_BRIEF,
     context: [
+      {
+        id: "ctx-seed-0",
+        title: COMPETITOR_INTEL.title,
+        kind: "note",
+        body: COMPETITOR_INTEL.body,
+        enabled: true,
+        createdAt: Date.now(),
+      },
       {
         id: "ctx-seed-1",
         title: "Best performing organic hook",
