@@ -301,6 +301,39 @@ export default function Dashboard({ initial }: { initial: AppState }) {
                 </div>
               </div>
 
+              <div className="field">
+                <label>Campaign focus</label>
+                <select
+                  value={state.settings.offerFocus}
+                  onChange={(e) =>
+                    setSetting({
+                      offerFocus: e.target.value as Settings["offerFocus"],
+                    })
+                  }
+                >
+                  <option value="auto">Auto — machine picks the offer</option>
+                  <option value="team-training">Team training only</option>
+                  <option value="workshop">Workshops only</option>
+                  <option value="free-lesson">Free lessons only</option>
+                  <option value="campus">Campus only</option>
+                </select>
+                <div className="hint">
+                  Pinning an offer makes every ad in the batch sell it, and
+                  targets the audiences most likely to buy it. Everything else
+                  — angle, hook, visual, tone — still varies and still evolves.
+                </div>
+              </div>
+
+              <div className="row">
+                <button
+                  className={`btn sm ${state.settings.brandLogo ? "on" : ""}`}
+                  onClick={() => setSetting({ brandLogo: !state.settings.brandLogo })}
+                  title="Send the real Light School mark to the image model as a reference"
+                >
+                  {state.settings.brandLogo ? "Logo in creative ✓" : "Logo in creative"}
+                </button>
+              </div>
+
               <div className="row">
                 <button
                   className={`btn sm ${state.settings.imageMode === "ai" ? "on" : ""}`}

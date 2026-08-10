@@ -199,6 +199,10 @@ export interface Settings {
   stepMode: boolean;
   /** Kill ads whose score falls below this percentile of the cycle. */
   killThreshold: number;
+  /** Pin the campaign to one offer, or let the machine pick per ad. */
+  offerFocus: "auto" | "team-training" | "workshop" | "free-lesson" | "campus";
+  /** Ask the image model to place the Light School mark in the creative. */
+  brandLogo: boolean;
 }
 
 export interface LogEntry {

@@ -49,7 +49,9 @@ export default function AdCard({
 
       <div className="fb">
         <div className="fb-head">
-          <div className="fb-avatar">LS</div>
+          <div className="fb-avatar">
+            <img src="/lightschool-logo.svg" alt="Light School" width={34} height={34} />
+          </div>
           <div>
             <div className="fb-name">Light School</div>
             <div className="fb-sponsored">Sponsored · 🌐</div>

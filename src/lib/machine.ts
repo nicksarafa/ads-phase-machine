@@ -131,6 +131,7 @@ function buildGenerateInput(s: AppState, insights = s.insights) {
     count: s.settings.adsPerCycle,
     cycle: s.machine.cycle,
     brief: s.brief,
+    offerFocus: s.settings.offerFocus,
     context: s.context,
     insights,
     exploit: exploitPlan(insights),
@@ -279,7 +280,10 @@ async function phaseGenerate(token: number): Promise<Generation | null> {
   };
 
   const cycleStamp = s.machine.cycle;
+  const focus = s.settings.offerFocus;
   result.ads.forEach((draft, i) => {
+    // A pinned campaign is a hard constraint, not a suggestion to the model.
+    if (focus !== "auto") draft.genes = { ...draft.genes, offer: focus };
     const id = nextAdId();
     const ad: Ad = {
       id,
@@ -362,7 +366,9 @@ async function phaseRender(generation: Generation, token: number) {
       if (!ad) continue;
       enqueue(async () => {
         try {
-          const res = await renderAiImage(ad.id, ad.creative.imagePrompt);
+          const res = await renderAiImage(ad.id, ad.creative.imagePrompt, {
+            withLogo: getState().settings.brandLogo,
+          });
           const live = getState().ads[ad.id];
           if (!live) return;
           live.image = {

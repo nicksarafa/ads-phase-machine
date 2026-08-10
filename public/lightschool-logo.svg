@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="logo-title logo-desc">
+  <title id="logo-title">Light School</title>
+  <desc id="logo-desc">Fine rays of light orbit a square microchip core</desc>
+  <style>
+    /* Vercel-style motion: compositor-friendly group transforms, layered
+       ambient and direct light, and a complete reduced-motion fallback. */
+    .logo-beams,
+    .logo-sparks,
+    .logo-aura {
+      transform-box: fill-box;
+      transform-origin: center;
+      will-change: transform;
+    }
+
+    .logo-beams { animation: logo-spin 56s linear infinite; }
+    .logo-sparks { animation: logo-spin-reverse 34s linear infinite; }
+    .logo-aura { animation: logo-breathe 5.5s ease-in-out infinite; }
+
+    @keyframes logo-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes logo-spin-reverse {
+      to { transform: rotate(-360deg); }
+    }
+
+    @keyframes logo-breathe {
+      0%, 100% { opacity: 0.45; transform: scale(0.96); }
+      50% { opacity: 0.82; transform: scale(1.04); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .logo-beams,
+      .logo-sparks,
+      .logo-aura { animation: none; }
+    }
+  </style>
+
+  <!-- Ambient light: two flat rings stay clean on the off-white canvas. -->
+  <g class="logo-aura" fill="none" stroke="#6868E8" transform-origin="32px 32px" aria-hidden="true">
+    <rect x="20.5" y="20.5" width="23" height="23" rx="5" stroke-width="0.55" opacity="0.14"/>
+    <rect x="18" y="18" width="28" height="28" rx="8" stroke-width="0.4" opacity="0.08"/>
+  </g>
+
+  <!-- Direct light: varied lengths keep the burst optical rather than mechanical. -->
+  <g class="logo-beams" fill="none" stroke="#0A0A0B" stroke-linecap="round" aria-hidden="true">
+    <g stroke-width="1.25">
+      <path d="M32 19.5V3"/>
+      <path d="M44.5 32H61"/>
+      <path d="M32 44.5V61"/>
+      <path d="M19.5 32H3"/>
+    </g>
+    <g stroke-width="1.05">
+      <path d="m40.8 23.2 11.7-11.7"/>
+      <path d="m40.8 40.8 11.7 11.7"/>
+      <path d="M23.2 40.8 11.5 52.5"/>
+      <path d="M23.2 23.2 11.5 11.5"/>
+    </g>
+    <g stroke-width="0.82" opacity="0.82">
+      <path d="m36.8 20.4 6.3-15.3"/>
+      <path d="m43.6 27.2 15.3-6.3"/>
+      <path d="m43.6 36.8 12.9 5.3"/>
+      <path d="m36.8 43.6 5.3 12.9"/>
+      <path d="m27.2 43.6-6.3 15.3"/>
+      <path d="m20.4 36.8-15.3 6.3"/>
+      <path d="M20.4 27.2 8 22.1"/>
+      <path d="M27.2 20.4 22.5 9"/>
+    </g>
+  </g>
+
+  <!-- Secondary glints create a livelier field without multicolor noise. -->
+  <g class="logo-sparks" fill="none" stroke="#6868E8" stroke-linecap="round" stroke-width="0.7" opacity="0.58" aria-hidden="true">
+    <path d="M32 16.5v-5"/>
+    <path d="m39.75 18.6 2.5-4.3"/>
+    <path d="m45.4 24.25 4.3-2.5"/>
+    <path d="M47.5 32h5"/>
+    <path d="m45.4 39.75 4.3 2.5"/>
+    <path d="m39.75 45.4 2.5 4.3"/>
+    <path d="M32 47.5v5"/>
+    <path d="m24.25 45.4-2.5 4.3"/>
+    <path d="m18.6 39.75-4.3 2.5"/>
+    <path d="M16.5 32h-5"/>
+    <path d="m18.6 24.25-4.3-2.5"/>
+    <path d="m24.25 18.6-2.5-4.3"/>
+  </g>
+
+  <!-- Fixed square chip core. The pins point into the surrounding light field. -->
+  <g aria-hidden="true" fill="none" stroke="#0A0A0B" stroke-linecap="round">
+    <g stroke-width="0.9">
+      <path d="M27.5 21.8v2.7M32 21.8v2.7M36.5 21.8v2.7"/>
+      <path d="M27.5 39.5v2.7M32 39.5v2.7M36.5 39.5v2.7"/>
+      <path d="M21.8 27.5h2.7M21.8 32h2.7M21.8 36.5h2.7"/>
+      <path d="M39.5 27.5h2.7M39.5 32h2.7M39.5 36.5h2.7"/>
+    </g>
+    <rect x="24.5" y="24.5" width="15" height="15" rx="2" fill="#FEFDF9" stroke-width="1.35"/>
+    <rect x="28.25" y="28.25" width="7.5" height="7.5" rx="1" fill="#0A0A0B" stroke="none"/>
+    <path d="M30.4 32h3.2M32 30.4v3.2" stroke="#FEFDF9" stroke-width="0.55" opacity="0.72"/>
+  </g>
+</svg>

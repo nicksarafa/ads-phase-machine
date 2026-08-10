@@ -30,6 +30,8 @@ export interface GenerateInput {
   count: number;
   cycle: number;
   brief: string;
+  /** When set, every ad in the batch sells this offer. */
+  offerFocus?: string;
   context: ContextSource[];
   insights: GeneInsight[];
   exploit: Partial<Record<GeneKey, string[]>>;
@@ -160,6 +162,20 @@ function buildPrompt(input: GenerateInput): string {
   }
 
   parts.push("");
+  if (input.offerFocus && input.offerFocus !== "auto") {
+    const o = BRAND.offers[input.offerFocus as keyof typeof BRAND.offers];
+    parts.push(
+      [
+        `CAMPAIGN FOCUS: every ad in this batch sells "${input.offerFocus}" — ${o?.label}.`,
+        `Set offer="${input.offerFocus}" on all ${input.count} ads. Do not vary the offer.`,
+        `Vary everything else: the angle, the hook, who it speaks to, the concrete build.`,
+        o ? `Landing context: ${o.note} CTA should read like "${o.cta}".` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+    parts.push("");
+  }
   parts.push(`TASK: write exactly ${input.count} Facebook feed ads.`);
   parts.push(
     [
@@ -299,13 +315,22 @@ function offline(input: GenerateInput): GenerateResult {
       return pick(GENE_SPACE[key], i * 7 + key.length);
     };
 
+    const focused = input.offerFocus && input.offerFocus !== "auto";
     const genes: Genes = {
       angle: exploitFor("angle"),
       hook: exploitFor("hook"),
-      audience: exploitFor("audience"),
+      // A pinned campaign sells one offer to the audiences most likely to buy it.
+      audience: focused
+        ? pick(
+            input.offerFocus === "team-training"
+              ? (["teams", "agency-owners", "operators", "founders"] as const)
+              : GENE_SPACE.audience,
+            i,
+          )
+        : exploitFor("audience"),
       visual: exploitFor("visual"),
       tone: exploitFor("tone"),
-      offer: exploitFor("offer"),
+      offer: focused ? input.offerFocus! : exploitFor("offer"),
     };
 
     const subject = pick(SUBJECTS, i + input.cycle * 3);

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { IMAGE_DIR } from "./store";
 import { hasBinary, run } from "./llm";
+import { BRAND_STYLE } from "./brand";
 import type { Genes } from "./types";
 
 /**
@@ -99,9 +100,36 @@ function isCredentialFailure(message: string): boolean {
   );
 }
 
+/** The Light School mark, base64'd once, for models that accept a reference image. */
+let markCache: string | null | undefined;
+function brandMark(): string | null {
+  if (markCache !== undefined) return markCache;
+  try {
+    const p = path.join(process.cwd(), "public", BRAND_STYLE.markPng);
+    markCache = fs.readFileSync(p).toString("base64");
+  } catch {
+    markCache = null;
+  }
+  return markCache;
+}
+
+/** Wrap the ad's own image prompt in the house art direction. */
+export function brandedPrompt(prompt: string, withLogo: boolean): string {
+  return [
+    prompt,
+    "",
+    BRAND_STYLE.artDirection,
+    withLogo
+      ? `Place ${BRAND_STYLE.markDescription} small and unobtrusive in one corner, as a real brand would — roughly 8% of the frame, correct proportions, no other text or lettering anywhere.`
+      : "No text, letters, words, logos or watermarks anywhere in the image.",
+    "Square 1:1 crop, suitable for a Facebook feed ad.",
+  ].join("\n");
+}
+
 export async function renderAiImage(
   adId: string,
   prompt: string,
+  opts: { withLogo?: boolean } = {},
 ): Promise<RenderResult> {
   const chain: ImageProvider[] = ["google", "openai", "claude-mcp"];
   const preferred = await resolveProvider();
@@ -113,12 +141,15 @@ export async function renderAiImage(
   );
   if (!order.length) throw new Error("no usable AI image provider");
 
+  const withLogo = opts.withLogo ?? false;
+  const full = brandedPrompt(prompt, withLogo);
+
   let lastError = "";
   for (const provider of order) {
     try {
-      if (provider === "google") return await renderGoogle(adId, prompt);
-      if (provider === "openai") return await renderOpenAi(adId, prompt);
-      if (provider === "claude-mcp") return await renderViaClaudeMcp(adId, prompt);
+      if (provider === "google") return await renderGoogle(adId, full, withLogo);
+      if (provider === "openai") return await renderOpenAi(adId, full);
+      if (provider === "claude-mcp") return await renderViaClaudeMcp(adId, full);
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
       if (isCredentialFailure(lastError)) {
@@ -148,7 +179,11 @@ export function demotedProviders(): string[] {
  * Google's Gemini image models ("Nano Banana Pro"). Returns the image inline as
  * base64 on the generateContent response rather than as a URL to fetch.
  */
-async function renderGoogle(adId: string, prompt: string): Promise<RenderResult> {
+async function renderGoogle(
+  adId: string,
+  prompt: string,
+  withLogo = false,
+): Promise<RenderResult> {
   const key = googleKey();
   if (!key) throw new Error("GEMINI_API_KEY is not set");
 
@@ -171,10 +206,23 @@ async function renderGoogle(adId: string, prompt: string): Promise<RenderResult>
         contents: [
           {
             role: "user",
+            // Nano Banana Pro renders a supplied mark far more faithfully than
+            // it renders one described in words, so pass the real PNG.
             parts: [
-              {
-                text: `${prompt}\n\nSquare 1:1 advertising image. No text, letters, words, logos or watermarks anywhere in the image.`,
-              },
+              ...(withLogo && brandMark()
+                ? [
+                    {
+                      inlineData: {
+                        mimeType: "image/png",
+                        data: brandMark() as string,
+                      },
+                    },
+                    {
+                      text: "Reference image: the Light School logo. Reproduce it exactly as given — do not redraw, restyle or add text to it.",
+                    },
+                  ]
+                : []),
+              { text: prompt },
             ],
           },
         ],
@@ -302,12 +350,13 @@ async function download(url: string, adId: string): Promise<string> {
 
 // -------------------------------------------------------- procedural artwork
 
+/** Tone-shifted variants of the Light School palette (violet #6868E8). */
 const PALETTES: Record<string, [string, string, string, string]> = {
-  warm: ["#2b1509", "#f2994a", "#ffd7a8", "#8b3a1a"],
-  urgent: ["#1b0710", "#ff4d6d", "#ffb3c1", "#7a1030"],
-  analytical: ["#08131f", "#3fa7ff", "#bfe3ff", "#12496e"],
-  playful: ["#160b26", "#a06bff", "#ffe27a", "#4a2a8a"],
-  authoritative: ["#0c0f0d", "#59d6a0", "#d6f5e6", "#1d5a44"],
+  warm: ["#17161f", "#8b7ae8", "#EFEAFB", "#3b2f6e"],
+  urgent: ["#14121c", "#6868E8", "#DEDCFA", "#4646b4"],
+  analytical: ["#0A0A0B", "#5D5DDA", "#DEDCFA", "#2f2f80"],
+  playful: ["#1a1526", "#8f6ef0", "#F0EFFE", "#5050C8"],
+  authoritative: ["#0A0A0B", "#6868E8", "#F0EFFE", "#252A0B"],
 };
 
 /**

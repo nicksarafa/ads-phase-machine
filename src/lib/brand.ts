@@ -4,6 +4,32 @@
  * whatever the operator adds in the Context panel.
  */
 
+/**
+ * Palette and mark lifted from the live site so generated creative sits next
+ * to the real thing without looking borrowed.
+ */
+export const BRAND_STYLE = {
+  violet: "#6868E8",
+  violetSoft: "#DEDCFA",
+  violetWhisper: "#F0EFFE",
+  ink: "#0A0A0B",
+  inkSoft: "#3E3E42",
+  inkMuted: "#6F6F76",
+  /** Served from /public — also sent to image models as a reference. */
+  logoSvg: "/lightschool-logo.svg",
+  markPng: "lightschool-mark.png",
+  /** What the mark actually depicts, for models that only get words. */
+  markDescription:
+    "the Light School mark: fine rays of light orbiting a square microchip core",
+  /** Appended to every image prompt so a batch reads as one campaign. */
+  artDirection: [
+    "Art direction: calm, premium, editorial. Natural light, real people at real desks,",
+    "shallow depth of field, generous negative space. Muted neutrals with a single",
+    "violet accent (#6868E8). Never stock-photo cheesy, never neon, never sci-fi,",
+    "no glowing brains, no robots, no circuit-board clichés.",
+  ].join(" "),
+} as const;
+
 export const BRAND = {
   name: "Light School",
   url: "https://lightschool.com",

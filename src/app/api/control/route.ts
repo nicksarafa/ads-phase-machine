@@ -72,6 +72,15 @@ export async function POST(req: Request) {
             s.settings.imageMode = v;
           } else if (k === "stepMode" && typeof v === "boolean") {
             s.settings.stepMode = v;
+          } else if (k === "brandLogo" && typeof v === "boolean") {
+            s.settings.brandLogo = v;
+          } else if (
+            k === "offerFocus" &&
+            ["auto", "team-training", "workshop", "free-lesson", "campus"].includes(
+              String(v),
+            )
+          ) {
+            s.settings.offerFocus = v as Settings["offerFocus"];
           }
         }
         persist();

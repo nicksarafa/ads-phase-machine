@@ -22,6 +22,8 @@ export const DEFAULT_SETTINGS: Settings = {
   imageMode: "ai",
   stepMode: false,
   killThreshold: 0.4,
+  offerFocus: "auto",
+  brandLogo: true,
 };
 
 export const DEFAULT_BRIEF = `You are the creative strategist for Light School's paid acquisition on Meta.
