@@ -66,6 +66,7 @@ function emptyState(): AppState {
       phaseProgress: 0,
       nextObserveAt: null,
       prefetch: "none",
+      credentials: { anthropic: false, gemini: false, openai: false, claudeCli: false },
       llmProvider: null,
       imageProvider: null,
       lastError: null,

@@ -246,11 +246,13 @@ async function phaseGenerate(token: number): Promise<Generation | null> {
       const secs = Math.floor((Date.now() - startedAt) / 1000);
       if (secs >= 10 && secs - announced >= 10) {
         announced = secs;
-        log(
-          `Still writing — ${secs}s elapsed. Set ANTHROPIC_API_KEY to cut this to a few seconds.`,
-          "warn",
-          "generate",
-        );
+        // Only suggest the key when one is genuinely missing — telling someone
+        // to set a variable they have already set sends them hunting for a
+        // bug that is not there.
+        const hint = process.env.ANTHROPIC_API_KEY
+          ? "Using the Anthropic API."
+          : "No ANTHROPIC_API_KEY in this process — falling back to the claude CLI. Set it in .env and restart to cut this to a few seconds.";
+        log(`Still writing — ${secs}s elapsed. ${hint}`, "warn", "generate");
       }
       flush();
     }

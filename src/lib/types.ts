@@ -227,6 +227,13 @@ export interface MachineState {
   prefetch: "none" | "writing" | "ready";
   llmProvider: string | null;
   imageProvider: string | null;
+  /** Which credentials the *running process* can actually see. */
+  credentials: {
+    anthropic: boolean;
+    gemini: boolean;
+    openai: boolean;
+    claudeCli: boolean;
+  };
   lastError: string | null;
 }
 

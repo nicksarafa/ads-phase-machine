@@ -137,6 +137,23 @@ export default function Dashboard({ initial }: { initial: AppState }) {
           {m.imageProvider ? ` · img: ${m.imageProvider}` : ""}
         </div>
 
+        {m.credentials && (
+          <div
+            className="statuspill"
+            title="Keys this server process can see. Next reads .env once at boot — edit it and restart."
+          >
+            <span
+              className="dot"
+              style={{
+                background: m.credentials.anthropic ? "var(--good)" : "var(--ink-faint)",
+              }}
+            />
+            key: {m.credentials.anthropic ? "anthropic ✓" : "anthropic ✗"}
+            {" · "}
+            {m.credentials.gemini ? "gemini ✓" : "gemini ✗"}
+          </div>
+        )}
+
         {m.prefetch !== "none" && (
           <div
             className="statuspill"
