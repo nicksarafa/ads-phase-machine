@@ -1,8 +1,21 @@
 node_modules
 .next
+out
+
+# Secrets. This is a public repo — nothing key-shaped goes in.
+# Every .env variant is ignored; .env.example is force-included below.
 .env
-.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.dev.vars
+
+# Generated at runtime
 data/state.json
 data/images
+
 *.tsbuildinfo
 next-env.d.ts
+.DS_Store

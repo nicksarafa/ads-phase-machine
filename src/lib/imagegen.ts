@@ -83,15 +83,65 @@ export interface RenderResult {
   provider: string;
 }
 
+/**
+ * Providers demoted for the rest of the process because their credential is
+ * present but not usable — wrong key type, no entitlement, or exhausted quota.
+ * Without this, a dead key makes every single ad pay the full request cost and
+ * fail, instead of the chain falling through to one that works.
+ */
+const demoted = new Set<ImageProvider>();
+
+/** Auth/entitlement/quota failures are permanent for this run; retrying them
+ *  per-ad just burns time. Transient network errors are not demoted. */
+function isCredentialFailure(message: string): boolean {
+  return /\b(400|401|403|404|429)\b|not set|UNAUTHENTICATED|PERMISSION_DENIED|quota/i.test(
+    message,
+  );
+}
+
 export async function renderAiImage(
   adId: string,
   prompt: string,
 ): Promise<RenderResult> {
-  const provider = await resolveProvider();
-  if (provider === "google") return renderGoogle(adId, prompt);
-  if (provider === "openai") return renderOpenAi(adId, prompt);
-  if (provider === "claude-mcp") return renderViaClaudeMcp(adId, prompt);
-  throw new Error("no AI image provider configured");
+  const chain: ImageProvider[] = ["google", "openai", "claude-mcp"];
+  const preferred = await resolveProvider();
+  if (preferred === "procedural") throw new Error("no AI image provider configured");
+
+  // Try the resolved provider first, then anything else that is configured.
+  const order = [preferred, ...chain.filter((p) => p !== preferred)].filter(
+    (p) => !demoted.has(p) && isConfigured(p),
+  );
+  if (!order.length) throw new Error("no usable AI image provider");
+
+  let lastError = "";
+  for (const provider of order) {
+    try {
+      if (provider === "google") return await renderGoogle(adId, prompt);
+      if (provider === "openai") return await renderOpenAi(adId, prompt);
+      if (provider === "claude-mcp") return await renderViaClaudeMcp(adId, prompt);
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      if (isCredentialFailure(lastError)) {
+        demoted.add(provider);
+        console.warn(
+          `[imagegen] ${provider} disabled for this run — ${lastError.slice(0, 160)}`,
+        );
+      }
+    }
+  }
+  throw new Error(lastError || "all image providers failed");
+}
+
+function isConfigured(p: ImageProvider): boolean {
+  if (p === "google") return Boolean(googleKey());
+  if (p === "openai") return Boolean(process.env.OPENAI_API_KEY);
+  if (p === "claude-mcp") return true;
+  return false;
+}
+
+/** Surfaced in the UI so a demoted provider is visible, not silent. */
+export function demotedProviders(): string[] {
+  return [...demoted];
 }
 
 /**
@@ -101,6 +151,16 @@ export async function renderAiImage(
 async function renderGoogle(adId: string, prompt: string): Promise<RenderResult> {
   const key = googleKey();
   if (!key) throw new Error("GEMINI_API_KEY is not set");
+
+  // AI Studio keys start with AIza. A Google Labs `AQ.` token authenticates
+  // against models.list but is not entitled to call generateContent, which
+  // surfaces as an empty-bodied 404 on every single ad — fail fast instead.
+  if (!key.startsWith("AIza")) {
+    throw new Error(
+      "403 GEMINI_API_KEY is not an AI Studio key (expected AIza…, got " +
+        `${key.slice(0, 3)}…). Create one at https://aistudio.google.com/apikey`,
+    );
+  }
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_IMAGE_MODEL}:generateContent`,
@@ -151,6 +211,7 @@ async function renderGoogle(adId: string, prompt: string): Promise<RenderResult>
       "no inline image in response";
     throw new Error(`gemini returned no image (${why})`);
   }
+
 
   const ext = (inline.mimeType ?? "").includes("jpeg")
     ? "jpg"
