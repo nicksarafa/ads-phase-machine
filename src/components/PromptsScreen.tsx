@@ -19,6 +19,7 @@ interface LibraryFile {
   body: string;
   bytes: number;
   enabled: boolean;
+  section: boolean;
 }
 
 interface Payload {
@@ -193,10 +194,19 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
               <Card key={f.name} className="py-0">
                 <CardContent className="p-3">
                   <div className="flex items-center gap-3">
-                    <Checkbox
-                      checked={f.enabled}
-                      onCheckedChange={() => act("toggle-file", { name: f.name })}
-                    />
+                    {f.section ? (
+                      <Badge
+                        variant="outline"
+                        title="Replaces a built-in section of the prompt — always in effect. Empty or delete the file to fall back to the built-in text."
+                      >
+                        always
+                      </Badge>
+                    ) : (
+                      <Checkbox
+                        checked={f.enabled}
+                        onCheckedChange={() => act("toggle-file", { name: f.name })}
+                      />
+                    )}
                     <button
                       className="flex-1 truncate text-left text-sm hover:text-primary"
                       onClick={() => {
@@ -281,7 +291,9 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Real files in <code>prompts/</code>. Ticked ones go into every generate.
+              Real files in <code>prompts/</code>. Ticked files are added to the
+              prompt. Files marked <em>always</em> replace a built-in section, so
+              they are in effect whether or not anything is ticked.
             </p>
           </TabsContent>
 

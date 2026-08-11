@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { pushState } from "@/lib/bus";
 import { REF_DIR, getState, log, persist } from "@/lib/store";
 import {
+  SECTION_FILES,
   createPromptFile,
   deletePromptFile,
   extraContextBlocks,
@@ -38,7 +39,11 @@ function payload() {
     context: s.context,
     files: listPromptFiles().map((f) => ({
       ...f,
-      enabled: s.enabledFiles.includes(f.name),
+      // A section file replaces a built-in part of the prompt and is always in
+      // effect; only extras are switchable, so the UI must not offer a
+      // checkbox that does nothing.
+      section: SECTION_FILES.includes(f.name),
+      enabled: SECTION_FILES.includes(f.name) || s.enabledFiles.includes(f.name),
     })),
     references: s.references,
     drafts: s.drafts,
