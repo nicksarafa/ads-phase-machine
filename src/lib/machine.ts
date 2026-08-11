@@ -343,6 +343,7 @@ async function phaseGenerate(token: number): Promise<Generation | null> {
       feedback: [],
       verdict: null,
       score: null,
+      judgement: null,
     };
     s.ads[id] = ad;
     s.adOrder.push(id);

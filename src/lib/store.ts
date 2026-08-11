@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   type AppState,
+  type ScoreRule,
+  type Scorecard,
   type LogEntry,
   type MachinePhase,
   type Settings,
@@ -60,6 +62,37 @@ Rules for every ad:
 - Avoid the saturated lines: "it's 2026", "Fortune 100 companies use us",
   and anything that sounds like an AI-avatar video tool.`;
 
+/**
+ * A starting rubric drawn from the rules the brief already states, so the
+ * feature is usable before anyone writes a rule. Edit or delete it freely.
+ */
+export function DEFAULT_SCORECARD(): Scorecard {
+  const rule = (component: ScoreRule["component"], label: string, points: number): ScoreRule => ({
+    id: `rule-${component}-${label.slice(0, 12).replace(/\W+/g, "-").toLowerCase()}`,
+    component,
+    label,
+    points,
+  });
+  return {
+    id: "sc-default",
+    name: "House bar",
+    enabled: true,
+    threshold: 70,
+    createdAt: Date.now(),
+    rules: [
+      rule("headline", "Under 40 characters", 10),
+      rule("headline", "Would make a business owner stop scrolling, not a learner", 15),
+      rule("primaryText", "Names one concrete build, number or objection rather than a vague benefit", 20),
+      rule("primaryText", "Says who the ad is for inside the copy", 10),
+      rule("primaryText", "Two to four short lines, no emoji walls or hashtag soup", 10),
+      rule("cta", "Reads like an action a budget holder takes", 10),
+      rule("imagePrompt", "Describes real people in a real workspace, not an abstract tech cliche", 10),
+      rule("overall", "Contains no em dash anywhere", 5),
+      rule("overall", "Sells team training rather than an individual course or free lesson", 10),
+    ],
+  };
+}
+
 function emptyState(): AppState {
   return {
     version: STATE_VERSION,
@@ -106,6 +139,7 @@ function emptyState(): AppState {
     ],
     references: [],
     assets: [],
+    scorecards: [DEFAULT_SCORECARD()],
     drafts: [],
     enabledFiles: ["design.md"],
     generations: [],
@@ -154,6 +188,7 @@ export function loadState(): AppState {
         // worth of ads and measured insight, which is the whole demo.
         slot.state.references ??= [];
         slot.state.assets ??= [];
+        slot.state.scorecards ??= [DEFAULT_SCORECARD()];
         slot.state.drafts ??= [];
         slot.state.enabledFiles ??= ["design.md"];
         // A process restart always stops the loop; the UI can start it again.

@@ -54,6 +54,82 @@ export interface GenerateInput {
   sections?: { brand?: string; hooks?: string };
 }
 
+/**
+ * Judge an ad against a scorecard.
+ *
+ * Separate from generation on purpose: the writer should not grade its own
+ * work in the same breath it produces it, and a rubric is cheap to re-run
+ * against ads that already exist. Needs the API — there is no offline judge,
+ * because a made-up score is worse than no score.
+ */
+export async function judgeAd(
+  ad: { headline: string; primaryText: string; description: string; cta: string; imagePrompt: string },
+  rules: { id: string; component: string; label: string; points: number }[],
+): Promise<{ ruleId: string; awarded: number; note: string }[] | null> {
+  if (!process.env.ANTHROPIC_API_KEY || !rules.length) return null;
+
+  const schema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["results"],
+    properties: {
+      results: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["ruleId", "awarded", "note"],
+          properties: {
+            ruleId: { type: "string", enum: rules.map((r) => r.id) },
+            awarded: { type: "integer" },
+            note: { type: "string" },
+          },
+        },
+      },
+    },
+  };
+
+  const prompt = [
+    "Score this ad against the rubric. Be strict: award full points only when the",
+    "rule plainly holds, zero when it plainly does not, and a partial amount in",
+    "between. Judge only what the rule asks about. Give a one-line reason for each.",
+    "",
+    "AD",
+    `headline: ${ad.headline}`,
+    `primaryText: ${ad.primaryText}`,
+    `description: ${ad.description}`,
+    `cta: ${ad.cta}`,
+    `imagePrompt: ${ad.imagePrompt}`,
+    "",
+    "RUBRIC",
+    ...rules.map((r) => `- id=${r.id} [${r.component}] "${r.label}" worth up to ${r.points} points`),
+    "",
+    "Return one result per rule id, with awarded between 0 and that rule's points.",
+  ].join("\n");
+
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
+  const client = new Anthropic();
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 4000,
+    system: "You are a demanding direct-response creative director grading ads against a rubric. You do not flatter.",
+    output_config: {
+      effort: "low",
+      format: { type: "json_schema", schema: schema as unknown as Record<string, unknown> },
+    },
+    messages: [{ role: "user", content: prompt }],
+  } as never);
+
+  const msg = response as unknown as { content: { type: string; text?: string }[] };
+  const text = msg.content.find((b) => b.type === "text")?.text ?? "";
+  try {
+    const parsed = JSON.parse(text) as { results?: { ruleId: string; awarded: number; note: string }[] };
+    return parsed.results ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export interface GenerateResult {
   ads: AdDraft[];
   provider: string;

@@ -151,6 +151,8 @@ export interface Ad {
   feedback: Feedback[];
   verdict: Verdict | null;
   score: number | null;
+  /** Latest pre-flight scorecard result, if one has been run. */
+  judgement: AdJudgement | null;
 }
 
 export interface GeneInsight {
@@ -214,6 +216,60 @@ export interface DesignAsset {
   role: "style" | "logo";
   enabled: boolean;
   createdAt: number;
+}
+
+/** The parts of a generated ad a rule can be written against. */
+export const SCORED_COMPONENTS = [
+  "headline",
+  "primaryText",
+  "description",
+  "cta",
+  "imagePrompt",
+  "overall",
+] as const;
+export type ScoredComponent = (typeof SCORED_COMPONENTS)[number];
+
+/** One testable claim about an ad, worth some points if it holds. */
+export interface ScoreRule {
+  id: string;
+  component: ScoredComponent;
+  /** Written as a test a reader could apply, e.g. "names a concrete build". */
+  label: string;
+  points: number;
+}
+
+/**
+ * A rubric an ad is judged against before it earns budget. This is a
+ * *pre-flight* quality bar, distinct from Ad.score, which is measured
+ * performance after the ad has actually delivered.
+ */
+export interface Scorecard {
+  id: string;
+  name: string;
+  enabled: boolean;
+  /** Percent of available points an ad needs to be worth running. */
+  threshold: number;
+  rules: ScoreRule[];
+  createdAt: number;
+}
+
+/** What a scorecard concluded about one ad. */
+export interface AdJudgement {
+  scorecardId: string;
+  scorecardName: string;
+  total: number;
+  max: number;
+  pass: boolean;
+  results: {
+    ruleId: string;
+    label: string;
+    component: ScoredComponent;
+    awarded: number;
+    max: number;
+    /** The judge's one-line reason, so a score is never unexplained. */
+    note: string;
+  }[];
+  at: number;
 }
 
 /** A candidate brief, produced by the rebuild button, held until it is used. */
@@ -292,6 +348,8 @@ export interface AppState {
   references: ReferenceAd[];
   /** Candidate briefs from "rebuild from winners", held until used. */
   drafts: PromptDraft[];
+  /** Rubrics ads are judged against before they earn budget. */
+  scorecards: Scorecard[];
   /** Images fed to the image model as visual references. */
   assets: DesignAsset[];
   /** Which `prompts/*.md` files are switched on. */

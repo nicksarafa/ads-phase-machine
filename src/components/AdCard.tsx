@@ -38,6 +38,16 @@ export default function AdCard({
       <div className="ad-meta">
         <span>{ad.label}</span>
         <span className={`tag ${statusTone(ad.status)}`}>{ad.status}</span>
+        {ad.judgement && (
+          <span
+            className={`tag ${ad.judgement.pass ? "good" : "bad"}`}
+            title={ad.judgement.results
+              .map((r) => `${r.awarded}/${r.max} ${r.label} — ${r.note}`)
+              .join("\n")}
+          >
+            {ad.judgement.total}/{ad.judgement.max}
+          </span>
+        )}
         {ad.verdict && (
           <span className={`tag ${ad.verdict === "winner" ? "good" : ad.verdict === "loser" ? "bad" : ""}`}>
             {ad.verdict}
@@ -107,6 +117,18 @@ export default function AdCard({
           </span>
         ))}
       </div>
+
+      {ad.judgement && (
+        <div className="ad-rationale">
+          <strong>{ad.judgement.scorecardName}:</strong>{" "}
+          {ad.judgement.pass ? "clears the bar" : "below the bar"}.{" "}
+          {ad.judgement.results
+            .filter((r) => r.awarded < r.max)
+            .slice(0, 2)
+            .map((r) => `${r.label} (${r.awarded}/${r.max}) — ${r.note}`)
+            .join(" ")}
+        </div>
+      )}
 
       {ad.creative.rationale && (
         <div className="ad-rationale">{ad.creative.rationale}</div>

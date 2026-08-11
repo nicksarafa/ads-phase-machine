@@ -10,7 +10,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import type { Ad, ContextSource, DesignAsset, PromptDraft, ReferenceAd } from "@/lib/types";
+import {
+  SCORED_COMPONENTS,
+  type Ad,
+  type ContextSource,
+  type DesignAsset,
+  type PromptDraft,
+  type ReferenceAd,
+  type Scorecard,
+  type ScoredComponent,
+} from "@/lib/types";
 
 interface LibraryFile {
   name: string;
@@ -48,6 +57,11 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
   const [ctxTitle, setCtxTitle] = useState("");
   const [ctxBody, setCtxBody] = useState("");
   const [ctxKind, setCtxKind] = useState<ContextSource["kind"]>("note");
+  const [cards, setCards] = useState<Scorecard[]>([]);
+  const [ruleLabel, setRuleLabel] = useState("");
+  const [rulePoints, setRulePoints] = useState(10);
+  const [ruleComp, setRuleComp] = useState<ScoredComponent>("primaryText");
+  const [judgeMsg, setJudgeMsg] = useState<string | null>(null);
   const [brief, setBrief] = useState("");
   const [briefDirty, setBriefDirty] = useState(false);
 
@@ -88,6 +102,34 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
       }
     },
     [act],
+  );
+
+  const loadCards = useCallback(async () => {
+    const r = await fetch("/api/scorecard");
+    if (r.ok) setCards(((await r.json()) as { scorecards: Scorecard[] }).scorecards);
+  }, []);
+  useEffect(() => {
+    void loadCards();
+  }, [loadCards]);
+
+  const cardAct = useCallback(
+    async (p: Record<string, unknown>) => {
+      setBusy(true);
+      setJudgeMsg(null);
+      try {
+        const r = await fetch("/api/scorecard", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(p),
+        });
+        const j = await r.json();
+        if (!r.ok) setJudgeMsg(j.error ?? "failed");
+        else setCards(j.scorecards as Scorecard[]);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [],
   );
 
   /** Context lives on its own endpoint; refresh the payload after each call. */
@@ -175,6 +217,7 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
             <TabsTrigger value="context">Context</TabsTrigger>
             <TabsTrigger value="refs">Ads I like</TabsTrigger>
             <TabsTrigger value="assets">Design assets</TabsTrigger>
+            <TabsTrigger value="score">Scorecard</TabsTrigger>
           </TabsList>
 
           <TabsContent value="brief" className="mt-4 space-y-2">
@@ -488,6 +531,136 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
               </Card>
             ))}
           </TabsContent>
+          <TabsContent value="score" className="mt-4 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              A rubric an ad is graded against before it earns budget. Each rule
+              targets one part of the generated ad and is worth points; an ad
+              clears the bar when it scores above the threshold. This is separate
+              from measured performance, which only exists after delivery.
+            </p>
+            {judgeMsg && <Badge variant="destructive">{judgeMsg}</Badge>}
+
+            {cards.map((c) => {
+              const max = c.rules.reduce((n, r) => n + r.points, 0);
+              return (
+                <Card key={c.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={c.enabled}
+                        onCheckedChange={() => cardAct({ action: "toggle-scorecard", id: c.id })}
+                      />
+                      <span className="flex-1">{c.name}</span>
+                      <Badge variant="secondary">{max} pts</Badge>
+                      <label className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                        pass at
+                        <Input
+                          type="number"
+                          className="h-7 w-16"
+                          value={c.threshold}
+                          onChange={(e) =>
+                            cardAct({
+                              action: "set-threshold",
+                              id: c.id,
+                              threshold: Number(e.target.value),
+                            })
+                          }
+                        />
+                        %
+                      </label>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => cardAct({ action: "delete-scorecard", id: c.id })}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1">
+                    {c.rules.map((r) => (
+                      <div key={r.id} className="flex items-center gap-2 text-xs">
+                        <Badge variant="outline" className="w-24 justify-center">
+                          {r.component}
+                        </Badge>
+                        <span className="flex-1">{r.label}</span>
+                        <Badge variant="secondary">{r.points}</Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            cardAct({ action: "delete-rule", id: c.id, ruleId: r.id })
+                          }
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    <div className="flex flex-wrap items-center gap-2 pt-2">
+                      <select
+                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+                        value={ruleComp}
+                        onChange={(e) => setRuleComp(e.target.value as ScoredComponent)}
+                      >
+                        {SCORED_COMPONENTS.map((k) => (
+                          <option key={k} value={k}>
+                            {k}
+                          </option>
+                        ))}
+                      </select>
+                      <Input
+                        className="flex-1 min-w-40"
+                        placeholder="What must be true, e.g. names a real number"
+                        value={ruleLabel}
+                        onChange={(e) => setRuleLabel(e.target.value)}
+                      />
+                      <Input
+                        type="number"
+                        className="w-20"
+                        value={rulePoints}
+                        onChange={(e) => setRulePoints(Number(e.target.value))}
+                      />
+                      <Button
+                        size="sm"
+                        disabled={!ruleLabel.trim() || busy}
+                        onClick={async () => {
+                          await cardAct({
+                            action: "add-rule",
+                            id: c.id,
+                            label: ruleLabel,
+                            component: ruleComp,
+                            points: rulePoints,
+                          });
+                          setRuleLabel("");
+                        }}
+                      >
+                        <Plus className="size-4" /> Rule
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => cardAct({ action: "add-scorecard", name: "New scorecard" })}
+              >
+                <Plus className="size-4" /> New scorecard
+              </Button>
+              <Button
+                disabled={busy}
+                onClick={() => cardAct({ action: "judge", limit: 6 })}
+                title="Grades the live ads. One model call per ad, so it is never automatic."
+              >
+                <Sparkles className="size-4" />
+                {busy ? "Scoring…" : "Score live ads"}
+              </Button>
+            </div>
+          </TabsContent>
+
           <TabsContent value="assets" className="mt-4 space-y-2">
             <p className="text-xs text-muted-foreground">
               Images handed to the image model with every render. A{" "}
