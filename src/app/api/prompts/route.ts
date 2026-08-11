@@ -4,8 +4,10 @@ import { NextResponse } from "next/server";
 import { pushState } from "@/lib/bus";
 import { REF_DIR, getState, log, persist } from "@/lib/store";
 import {
+  MAIN_FILE,
   SECTION_FILES,
   createPromptFile,
+  mainPrompt,
   deletePromptFile,
   extraContextBlocks,
   listPromptFiles,
@@ -15,7 +17,7 @@ import {
 import { brandedPrompt } from "@/lib/imagegen";
 import { generateAds, previewPrompt } from "@/lib/llm";
 import { buildGenerateInput } from "@/lib/machine";
-import type { Ad, PromptDraft, ReferenceAd } from "@/lib/types";
+import type { Ad, DesignAsset, PromptDraft, ReferenceAd } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,17 +37,19 @@ function payload() {
   const input = buildGenerateInput(s);
   const { system, user } = previewPrompt(input);
   return {
-    brief: s.brief,
+    brief: mainPrompt(s.brief),
     context: s.context,
-    files: listPromptFiles().map((f) => ({
+    files: listPromptFiles()
+      .filter((f) => f.name !== MAIN_FILE)
+      .map((f) => ({
       ...f,
-      // A section file replaces a built-in part of the prompt and is always in
-      // effect; only extras are switchable, so the UI must not offer a
-      // checkbox that does nothing.
+      // A section file replaces a built-in part of the prompt when switched
+      // on, rather than being appended like an extra. Both kinds toggle.
       section: SECTION_FILES.includes(f.name),
-      enabled: SECTION_FILES.includes(f.name) || s.enabledFiles.includes(f.name),
+      enabled: s.enabledFiles.includes(f.name),
     })),
     references: s.references,
+    assets: s.assets,
     drafts: s.drafts,
     live: {
       system,
@@ -196,6 +200,59 @@ export async function POST(req: Request) {
         }
       }
       s.references = s.references.filter((x) => x.id !== body.name);
+      return ok();
+    }
+
+    // --------------------------------------------------------------- assets
+    case "add-asset": {
+      const m = /^data:(image\/(png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(
+        String(body.text ?? ""),
+      );
+      if (!m) {
+        return NextResponse.json({ error: "expected a png/jpeg/webp image" }, { status: 400 });
+      }
+      const buf = Buffer.from(m[3], "base64");
+      if (buf.byteLength > 4_000_000) {
+        return NextResponse.json({ error: "image over 4MB" }, { status: 400 });
+      }
+      const id = rid("asset");
+      const file = `${id}.${m[2] === "jpeg" ? "jpg" : m[2]}`;
+      fs.mkdirSync(REF_DIR, { recursive: true });
+      fs.writeFileSync(path.join(REF_DIR, file), new Uint8Array(buf));
+
+      const asset: DesignAsset = {
+        id,
+        title: String(body.title || "Asset").slice(0, 80),
+        file,
+        mime: m[1],
+        role: body.name === "logo" ? "logo" : "style",
+        enabled: true,
+        createdAt: Date.now(),
+      };
+      s.assets.unshift(asset);
+      log(`Added design asset "${asset.title}" (${asset.role}).`, "good");
+      return ok();
+    }
+    case "toggle-asset": {
+      const a = s.assets.find((x) => x.id === body.name);
+      if (a) a.enabled = !a.enabled;
+      return ok();
+    }
+    case "asset-role": {
+      const a = s.assets.find((x) => x.id === body.name);
+      if (a) a.role = a.role === "logo" ? "style" : "logo";
+      return ok();
+    }
+    case "delete-asset": {
+      const gone = s.assets.find((x) => x.id === body.name);
+      if (gone) {
+        try {
+          fs.rmSync(path.join(REF_DIR, gone.file), { force: true });
+        } catch {
+          /* best effort */
+        }
+      }
+      s.assets = s.assets.filter((x) => x.id !== body.name);
       return ok();
     }
 

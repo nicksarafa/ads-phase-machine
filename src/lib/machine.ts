@@ -12,7 +12,9 @@ import {
   writeProcedural,
 } from "./imagegen";
 import { simulateWindow } from "./simulator";
-import { extraContextBlocks } from "./library";
+import { extraContextBlocks, mainPrompt, sectionOr } from "./library";
+import { brandBlock } from "./brand";
+import { hookBriefBlock } from "./hooks";
 import { computeInsights, exploitPlan, learningsFrom, scoreAd } from "./insights";
 import {
   EMPTY_METRICS,
@@ -147,7 +149,7 @@ export function buildGenerateInput(s: AppState, insights = s.insights) {
   return {
     count: s.settings.adsPerCycle,
     cycle: s.machine.cycle,
-    brief: s.brief,
+    brief: mainPrompt(s.brief),
     offerFocus: s.settings.offerFocus,
     context: s.context,
     insights,
@@ -169,6 +171,10 @@ export function buildGenerateInput(s: AppState, insights = s.insights) {
       .filter((r) => r.enabled)
       .map((r) => ({ title: r.title, body: r.body, image: refImage(r) })),
     files: extraContextBlocks(s.enabledFiles),
+    sections: {
+      brand: sectionOr("brand-block.md", brandBlock(), s.enabledFiles),
+      hooks: sectionOr("hook-patterns.md", hookBriefBlock(), s.enabledFiles),
+    },
   };
 }
 

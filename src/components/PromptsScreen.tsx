@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import type { Ad, ContextSource, PromptDraft, ReferenceAd } from "@/lib/types";
+import type { Ad, ContextSource, DesignAsset, PromptDraft, ReferenceAd } from "@/lib/types";
 
 interface LibraryFile {
   name: string;
@@ -27,6 +27,7 @@ interface Payload {
   context: ContextSource[];
   files: LibraryFile[];
   references: ReferenceAd[];
+  assets: DesignAsset[];
   drafts: PromptDraft[];
   live: { system: string; user: string; image: string; chars: number };
 }
@@ -107,6 +108,26 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
     [load],
   );
 
+  /** Upload a design asset for the image model. */
+  const uploadAsset = useCallback(
+    async (files: FileList | null, role: "style" | "logo") => {
+      for (const f of Array.from(files ?? []).slice(0, 6)) {
+        const dataUrl: string = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = () => res(String(fr.result));
+          fr.onerror = () => rej(fr.error);
+          fr.readAsDataURL(f);
+        });
+        await act("add-asset", {
+          title: f.name.replace(/\.[^.]+$/, ""),
+          text: dataUrl,
+          name: role,
+        });
+      }
+    },
+    [act],
+  );
+
   /** Read an image in the browser and post it as a data URL. */
   const uploadImage = useCallback(
     async (files: FileList | null) => {
@@ -153,6 +174,7 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
             <TabsTrigger value="files">Files</TabsTrigger>
             <TabsTrigger value="context">Context</TabsTrigger>
             <TabsTrigger value="refs">Ads I like</TabsTrigger>
+            <TabsTrigger value="assets">Design assets</TabsTrigger>
           </TabsList>
 
           <TabsContent value="brief" className="mt-4 space-y-2">
@@ -169,22 +191,16 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
               <Button
                 disabled={!briefDirty || busy}
                 onClick={async () => {
-                  setBusy(true);
-                  await fetch("/api/brief", {
-                    method: "PUT",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ brief }),
-                  });
+                  await act("save-file", { name: "main.md", text: brief });
                   setBriefDirty(false);
-                  setBusy(false);
-                  await load();
                 }}
               >
                 Save brief
               </Button>
               {briefDirty && <Badge variant="secondary">unsaved</Badge>}
               <span className="text-xs text-muted-foreground">
-                Takes effect on the next generate.
+                Saved to <code>prompts/main.md</code>. Always in effect, no
+                switch. Takes effect on the next generate.
               </span>
             </div>
           </TabsContent>
@@ -194,19 +210,10 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
               <Card key={f.name} className="py-0">
                 <CardContent className="p-3">
                   <div className="flex items-center gap-3">
-                    {f.section ? (
-                      <Badge
-                        variant="outline"
-                        title="Replaces a built-in section of the prompt — always in effect. Empty or delete the file to fall back to the built-in text."
-                      >
-                        always
-                      </Badge>
-                    ) : (
-                      <Checkbox
-                        checked={f.enabled}
-                        onCheckedChange={() => act("toggle-file", { name: f.name })}
-                      />
-                    )}
+                    <Checkbox
+                      checked={f.enabled}
+                      onCheckedChange={() => act("toggle-file", { name: f.name })}
+                    />
                     <button
                       className="flex-1 truncate text-left text-sm hover:text-primary"
                       onClick={() => {
@@ -218,6 +225,14 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
                     >
                       {f.title}
                     </button>
+                    {f.section && (
+                      <Badge
+                        variant="outline"
+                        title="Replaces a built-in section of the prompt. Off means the built-in text is used instead."
+                      >
+                        overrides
+                      </Badge>
+                    )}
                     <Badge variant="secondary">{f.body.length}c</Badge>
                     <Button
                       variant="ghost"
@@ -291,9 +306,9 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Real files in <code>prompts/</code>. Ticked files are added to the
-              prompt. Files marked <em>always</em> replace a built-in section, so
-              they are in effect whether or not anything is ticked.
+              Real files in <code>prompts/</code>. Ticked files go into every
+              generate. One marked <em>overrides</em> replaces a built-in
+              section of the prompt; untick it and the built-in text comes back.
             </p>
           </TabsContent>
 
@@ -472,6 +487,80 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
                 </CardContent>
               </Card>
             ))}
+          </TabsContent>
+          <TabsContent value="assets" className="mt-4 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Images handed to the image model with every render. A{" "}
+              <strong>logo</strong> is reproduced exactly; a <strong>style</strong>{" "}
+              reference contributes palette, lighting and mood only. Nano Banana Pro
+              follows a supplied image far more closely than a written description.
+            </p>
+
+            {data?.assets.map((a) => (
+              <Card key={a.id} className="py-0">
+                <CardContent className="flex items-center gap-3 p-3">
+                  <Checkbox
+                    checked={a.enabled}
+                    onCheckedChange={() => act("toggle-asset", { name: a.id })}
+                  />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/ref/${a.file}`}
+                    alt=""
+                    className="size-12 rounded object-cover"
+                  />
+                  <span className="flex-1 truncate text-sm">{a.title}</span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => act("asset-role", { name: a.id })}
+                    title="Switch between exact reproduction and style-only"
+                  >
+                    {a.role}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => act("delete-asset", { name: a.id })}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+
+            <div className="flex gap-2">
+              <Button asChild variant="secondary">
+                <label className="cursor-pointer">
+                  <ImagePlus className="size-4" /> Upload style reference
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      void uploadAsset(e.target.files, "style");
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </Button>
+              <Button asChild variant="secondary">
+                <label className="cursor-pointer">
+                  <ImagePlus className="size-4" /> Upload logo
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      void uploadAsset(e.target.files, "logo");
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
 

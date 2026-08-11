@@ -18,24 +18,64 @@ research → generate → render → launch → observe ×N → evaluate → evo
 ## Quick start
 
 ```bash
+git clone https://github.com/nicksarafa/ads-phase-machine
+cd ads-phase-machine
 npm install
+cp .env.example .env
+```
+
+### Add your own API keys
+
+This repo ships with **no keys**. `.env` is gitignored and stays on your
+machine. You need two, and they are separate services:
+
+| Key | What it does | Where to get it |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Writes the ad copy and the strategy behind it | [console.anthropic.com](https://console.anthropic.com/settings/keys) → API keys → Create key. Starts `sk-ant-`. |
+| `GEMINI_API_KEY` | Renders the ad images with Nano Banana Pro | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → Create API key |
+
+Open `.env` and paste them in:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
+GEMINI_IMAGE_MODEL=gemini-3-pro-image
+```
+
+Then start it:
+
+```bash
 npm run dev          # http://localhost:3737
 ```
 
 Press **▶ Run demo**. Within a minute you will have your first generation of
 ads on the wall with live spend, clicks and conversions climbing.
 
-To make it fast, drop a key in `.env`:
+**Check the keys took.** The header shows a dot per credential, and hovering it
+names each one. `.env` is read once at boot, so restart after editing it.
 
-```bash
-cp .env.example .env
-# then set ANTHROPIC_API_KEY=...
-```
+### Running it without keys
 
-Without a key the app falls back to your local `claude` CLI (uses your existing
-Claude Code auth, no key needed) — it works, but a generate phase takes 60–120
-seconds instead of ~10. With neither, an offline composer keeps the loop
-running so the demo never dies on stage.
+Both keys are optional and the loop degrades rather than stopping:
+
+- **No `ANTHROPIC_API_KEY`** — falls back to your local `claude` CLI, using your
+  existing Claude Code auth with no key needed. It works, but a generate phase
+  takes 60–120 seconds instead of about 10. With neither, an offline composer
+  keeps the loop running so a demo never dies on stage.
+- **No `GEMINI_API_KEY`** — every ad still gets artwork. The procedural
+  generator draws it instantly and locally, so the wall is never empty.
+
+### What it costs
+
+Image generation is the expensive part: Nano Banana Pro is billed per image and
+the machine renders one per ad, every cycle. Two controls matter before you
+leave it running:
+
+- **Ads / cycle** in Demo controls sets how many images each cycle renders.
+- **Procedural imagery** in Demo controls turns AI rendering off entirely.
+
+`POST /api/render` with `{"limit": 1}` renders exactly one image when you want
+to test the path without starting the loop.
 
 ---
 

@@ -105,6 +105,7 @@ function emptyState(): AppState {
       },
     ],
     references: [],
+    assets: [],
     drafts: [],
     enabledFiles: ["design.md"],
     generations: [],
@@ -152,6 +153,7 @@ export function loadState(): AppState {
         // version instead would be correct but would throw away a long run's
         // worth of ads and measured insight, which is the whole demo.
         slot.state.references ??= [];
+        slot.state.assets ??= [];
         slot.state.drafts ??= [];
         slot.state.enabledFiles ??= ["design.md"];
         // A process restart always stops the loop; the UI can start it again.

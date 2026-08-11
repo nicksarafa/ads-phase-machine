@@ -200,6 +200,22 @@ export interface ReferenceAd {
   createdAt: number;
 }
 
+/**
+ * An image handed to the image model as a visual reference — a logo lockup, a
+ * colour board, a photography sample. Distinct from a ReferenceAd, which is a
+ * *copy* format exemplar read by the text model.
+ */
+export interface DesignAsset {
+  id: string;
+  title: string;
+  file: string;
+  mime: string;
+  /** How the image model should treat it. */
+  role: "style" | "logo";
+  enabled: boolean;
+  createdAt: number;
+}
+
 /** A candidate brief, produced by the rebuild button, held until it is used. */
 export interface PromptDraft {
   id: string;
@@ -276,6 +292,8 @@ export interface AppState {
   references: ReferenceAd[];
   /** Candidate briefs from "rebuild from winners", held until used. */
   drafts: PromptDraft[];
+  /** Images fed to the image model as visual references. */
+  assets: DesignAsset[];
   /** Which `prompts/*.md` files are switched on. */
   enabledFiles: string[];
   generations: Generation[];

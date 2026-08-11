@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { IMAGE_DIR } from "./store";
+import { IMAGE_DIR, REF_DIR, getState } from "./store";
 import { hasBinary, run } from "./llm";
 import { BRAND_STYLE } from "./brand";
 import { designDirection } from "./library";
@@ -119,6 +119,36 @@ function brandMark(): string | null {
   return markCache;
 }
 
+/**
+ * Enabled design assets as image blocks for the Interactions API.
+ *
+ * Nano Banana Pro reproduces a supplied image far more faithfully than one
+ * described in words, so a colour board or a photography sample does more work
+ * here than another paragraph of art direction. Each is labelled by role: a
+ * logo must be reproduced exactly, a style reference must not be copied.
+ */
+function assetBlocks(): Record<string, unknown>[] {
+  const s = getState();
+  const out: Record<string, unknown>[] = [];
+  for (const a of s.assets.filter((x) => x.enabled)) {
+    let data: string;
+    try {
+      data = fs.readFileSync(path.join(REF_DIR, a.file)).toString("base64");
+    } catch {
+      continue; // a deleted file must not fail the render
+    }
+    out.push({
+      type: "text",
+      text:
+        a.role === "logo"
+          ? `Reference image "${a.title}": a brand mark. Reproduce it exactly as given — do not redraw, restyle, recolour or add text to it.`
+          : `Reference image "${a.title}": a style reference for palette, lighting and mood only. Do not copy its subject, composition or any text in it.`,
+    });
+    out.push({ type: "image", mime_type: a.mime, data });
+  }
+  return out;
+}
+
 /** Wrap the ad's own image prompt in the house art direction. */
 export function brandedPrompt(prompt: string, withLogo: boolean): string {
   return [
@@ -126,7 +156,7 @@ export function brandedPrompt(prompt: string, withLogo: boolean): string {
     "",
     // `prompts/design.md` owns the house look; the constant is the fallback so
     // an emptied or missing file can never stop the wall rendering mid-demo.
-    designDirection(BRAND_STYLE.artDirection),
+    designDirection(BRAND_STYLE.artDirection, getState().enabledFiles),
     withLogo
       ? `Place ${BRAND_STYLE.markDescription} small and unobtrusive in one corner, as a real brand would — roughly 8% of the frame, correct proportions, no other text or lettering anywhere.`
       : "No text, letters, words, logos or watermarks anywhere in the image.",
@@ -159,7 +189,12 @@ export async function renderAiImage(
       if (provider === "openai") return await renderOpenAi(adId, full);
       if (provider === "claude-mcp") return await renderViaClaudeMcp(adId, full);
     } catch (e) {
-      lastError = e instanceof Error ? e.message : String(e);
+      // Node's fetch reports "fetch failed" and puts the real reason on
+      // .cause, which is the difference between a DNS problem and a 400.
+      const cause = (e as { cause?: unknown })?.cause;
+      lastError =
+        (e instanceof Error ? e.message : String(e)) +
+        (cause ? ` (cause: ${cause instanceof Error ? cause.message : String(cause)})` : "");
       if (isCredentialFailure(lastError)) {
         demoted.add(provider);
         console.warn(
@@ -212,6 +247,7 @@ async function renderGoogle(
         // renders one described in words, so pass the real PNG.
         input: [
           { type: "text", text: prompt },
+          ...assetBlocks(),
           ...(withLogo && brandMark()
             ? [
                 {

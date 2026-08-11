@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import { GENE_SPACE, type Ad, type GeneKey, type Genes } from "./types";
 import { BRAND, brandBlock } from "./brand";
 import { hookBriefBlock } from "./hooks";
-import { sectionOr } from "./library";
 import type { ContextSource, GeneInsight } from "./types";
 
 /**
@@ -51,6 +50,8 @@ export interface GenerateInput {
   }[];
   /** Bodies of the enabled `prompts/*.md` files, already note-stripped. */
   files?: string[];
+  /** Built-in sections the operator has chosen to override with a file. */
+  sections?: { brand?: string; hooks?: string };
 }
 
 export interface GenerateResult {
@@ -121,13 +122,13 @@ export function previewPrompt(input: GenerateInput): { system: string; user: str
 function buildPrompt(input: GenerateInput): string {
   const parts: string[] = [];
 
-  parts.push(sectionOr("brand-block.md", brandBlock()));
+  parts.push(input.sections?.brand ?? brandBlock());
   parts.push("");
   parts.push("OPERATOR BRIEF (this is the current prompt, edited live in the UI):");
   parts.push(input.brief.trim());
 
   parts.push("");
-  parts.push(sectionOr("hook-patterns.md", hookBriefBlock()));
+  parts.push(input.sections?.hooks ?? hookBriefBlock());
 
   for (const f of input.files ?? []) {
     parts.push("");

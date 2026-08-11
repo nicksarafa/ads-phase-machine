@@ -129,11 +129,24 @@ export function deletePromptFile(name: string): boolean {
 export const SECTION_FILES = ["design.md", "brand-block.md", "hook-patterns.md"];
 
 /**
+ * The main prompt. Unlike a section file this has no switch: it *is* the
+ * brief, so there is nothing sensible for "off" to mean. Edit the file or the
+ * Brief tab — same file, same edit.
+ */
+export const MAIN_FILE = "main.md";
+
+export function mainPrompt(fallback: string): string {
+  const f = readPromptFile(MAIN_FILE);
+  return f?.body ? f.body : fallback;
+}
+
+/**
  * A prompt section, overridden by a file when one exists. The code default is
  * the fallback so emptying or deleting a file degrades to the built-in text
  * rather than punching a hole in the prompt.
  */
-export function sectionOr(name: string, fallback: string): string {
+export function sectionOr(name: string, fallback: string, enabled: string[]): string {
+  if (!enabled.includes(name)) return fallback;
   const f = readPromptFile(name);
   return f?.body ? f.body : fallback;
 }
@@ -143,7 +156,8 @@ export function sectionOr(name: string, fallback: string): string {
  * is the fallback so a missing or emptied file can never stop the wall from
  * rendering mid-demo.
  */
-export function designDirection(fallback: string): string {
+export function designDirection(fallback: string, enabled: string[]): string {
+  if (!enabled.includes("design.md")) return fallback;
   const f = readPromptFile("design.md");
   return f?.body ? f.body : fallback;
 }
@@ -151,7 +165,7 @@ export function designDirection(fallback: string): string {
 /** Extra files the operator has switched on, as prompt-ready blocks. */
 export function extraContextBlocks(enabled: string[]): string[] {
   return enabled
-    .filter((n) => !SECTION_FILES.includes(n))
+    .filter((n) => !SECTION_FILES.includes(n) && n !== MAIN_FILE)
     .map((n) => readPromptFile(n))
     .filter((f): f is PromptFile => f !== null && f.body.length > 0)
     .map((f) => `[${f.title}]\n${f.body}`);
