@@ -64,6 +64,7 @@ export async function POST(req: Request) {
     enqueue(async () => {
       try {
         const res = await renderAiImage(ad.id, ad.creative.imagePrompt, {
+          headline: ad.creative.headline,
           withLogo: getState().settings.brandLogo,
         });
         const live = getState().ads[ad.id];

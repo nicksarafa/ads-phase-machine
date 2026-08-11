@@ -149,25 +149,58 @@ function assetBlocks(): Record<string, unknown>[] {
   return out;
 }
 
-/** Wrap the ad's own image prompt in the house art direction. */
-export function brandedPrompt(prompt: string, withLogo: boolean): string {
+/**
+ * Wrap the ad's own image prompt in the house art direction.
+ *
+ * When a headline is supplied it is set *into* the artwork rather than left to
+ * the feed's caption, because a scroll-stopping feed ad is typography and
+ * image together. The exact words are quoted so the model sets that line and
+ * does not invent its own.
+ */
+export function brandedPrompt(
+  prompt: string,
+  withLogo: boolean,
+  headline?: string,
+): string {
+  const h = (headline ?? "").trim();
   return [
-    prompt,
+    // Lead with the format. Putting the ad's own scene first made the model
+    // anchor on "photograph" and treat the art direction as optional trim —
+    // half the batch came back as bright stock offices with no type in them.
+    "Design a single square social ad for Light School.",
+    "This is a dark editorial poster with typography set into it. It is NOT a",
+    "photograph with a caption, and NOT a stock photo.",
     "",
-    // `prompts/design.md` owns the house look; the constant is the fallback so
-    // an emptied or missing file can never stop the wall rendering mid-demo.
+    ...(h
+      ? [
+          `HERO HEADLINE — must appear, set large in the upper half: "${h}"`,
+          "Spell it exactly, letter for letter. No other words anywhere: no",
+          "subtitle, no body copy, no logo text, no watermark, no caption.",
+          "",
+        ]
+      : ["No text, letters, words, logos or watermarks anywhere in the image.", ""]),
+    "PHOTOGRAPHIC ELEMENT — subordinate to the type, never the whole frame:",
+    prompt,
+    "Reduce it to ONE person, or two at the very most, even if the line above",
+    "describes a group — a crowd around a laptop reads as stock and kills it.",
+    "Grade it dark and low-key. It must be feathered into the black on every",
+    "side, with no straight edge, no rectangle, no border and no card. The eye",
+    "should not be able to find where the photograph ends.",
+    "",
     designDirection(BRAND_STYLE.artDirection, getState().enabledFiles),
-    withLogo
-      ? `Place ${BRAND_STYLE.markDescription} small and unobtrusive in one corner, as a real brand would — roughly 8% of the frame, correct proportions, no other text or lettering anywhere.`
-      : "No text, letters, words, logos or watermarks anywhere in the image.",
-    "Square 1:1 crop, suitable for a Facebook feed ad.",
+    ...(withLogo
+      ? [
+          `Place ${BRAND_STYLE.markDescription} small in one corner, roughly 6% of the frame, correct proportions.`,
+        ]
+      : []),
+    "Square 1:1, built for a Facebook feed at thumbnail size.",
   ].join("\n");
 }
 
 export async function renderAiImage(
   adId: string,
   prompt: string,
-  opts: { withLogo?: boolean } = {},
+  opts: { withLogo?: boolean; headline?: string } = {},
 ): Promise<RenderResult> {
   const chain: ImageProvider[] = ["google", "openai", "claude-mcp"];
   const preferred = await resolveProvider();
@@ -180,7 +213,7 @@ export async function renderAiImage(
   if (!order.length) throw new Error("no usable AI image provider");
 
   const withLogo = opts.withLogo ?? false;
-  const full = brandedPrompt(prompt, withLogo);
+  const full = brandedPrompt(prompt, withLogo, opts.headline);
 
   let lastError = "";
   for (const provider of order) {

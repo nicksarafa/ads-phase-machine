@@ -35,6 +35,9 @@ Rules for every ad:
 - Use a different proven hook pattern for each ad in the batch, and name the
   pattern you used in the rationale.
 - Never reuse a competitor's wording. Borrow the structure, write our sentence.
+- imagePrompt describes ONE person, or two at most, alone in a dark room lit by
+  a single warm source, mid-work, not looking at the camera. Never a group, a
+  meeting, a crowd around a screen, or a bright office.
 - Never use an em dash. Not anywhere, not ever, in any field. No "—". Use a
   full stop, a comma, or a colon instead. An em dash is the single clearest
   tell that copy was machine-written, and it gets the ad skipped.
