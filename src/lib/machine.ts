@@ -10,6 +10,7 @@ import {
   writeProcedural,
 } from "./imagegen";
 import { simulateWindow } from "./simulator";
+import { extraContextBlocks } from "./library";
 import { computeInsights, exploitPlan, learningsFrom, scoreAd } from "./insights";
 import {
   EMPTY_METRICS,
@@ -123,7 +124,7 @@ async function phaseResearch(token: number) {
 }
 
 /** Everything the copywriter needs, assembled from current state. */
-function buildGenerateInput(s: AppState, insights = s.insights) {
+export function buildGenerateInput(s: AppState, insights = s.insights) {
   const pool = allAds(s);
   const scoredPool = pool.filter((a) => a.score !== null);
 
@@ -148,6 +149,10 @@ function buildGenerateInput(s: AppState, insights = s.insights) {
       )
       .slice(-8),
     usedHeadlines: pool.map((a) => a.creative.headline),
+    references: s.references
+      .filter((r) => r.enabled)
+      .map((r) => ({ title: r.title, body: r.body })),
+    files: extraContextBlocks(s.enabledFiles),
   };
 }
 

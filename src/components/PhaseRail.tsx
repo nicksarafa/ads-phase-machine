@@ -1,6 +1,6 @@
 "use client";
 
-import { PHASES, PHASE_BLURBS, PHASE_LABELS, type MachineState } from "@/lib/types";
+import { PHASES, PHASE_LABELS, type MachineState } from "@/lib/types";
 
 export default function PhaseRail({ machine }: { machine: MachineState }) {
   const currentIdx = PHASES.indexOf(machine.phase as (typeof PHASES)[number]);
@@ -20,7 +20,6 @@ export default function PhaseRail({ machine }: { machine: MachineState }) {
               {done ? " ✓" : ""}
             </div>
             <div className="phase-name">{PHASE_LABELS[p]}</div>
-            <div className="phase-blurb">{PHASE_BLURBS[p]}</div>
             {active && (
               <div
                 className="phase-bar"

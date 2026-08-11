@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdCard from "./AdCard";
 import PhaseRail from "./PhaseRail";
 import PerfChart from "./PerfChart";
+import PromptsPanel from "./PromptsPanel";
 import { clock, hours, int, money, mult, pct } from "@/lib/format";
 import {
   PHASE_LABELS,
@@ -242,9 +243,8 @@ export default function Dashboard({ initial }: { initial: AppState }) {
                   onChange={(e) => setSetting({ speed: Number(e.target.value) })}
                 />
                 <div className="hint">
-                  One 6-hour observation window takes{" "}
                   {humanWindow(state.settings.secondsPerWindow / state.settings.speed)}{" "}
-                  at this speed. A full cycle is {state.settings.windowsPerCycle} windows.
+                  per 6h window · {state.settings.windowsPerCycle} per cycle
                 </div>
               </div>
 
@@ -367,8 +367,7 @@ export default function Dashboard({ initial }: { initial: AppState }) {
               </div>
               <div className="hint">
                 In AI mode every ad calls an image model. Generation is async —
-                the card shows procedural artwork and swaps when the render
-                lands, so a fast demo never stalls on it.
+
               </div>
             </div>
           </section>
@@ -403,11 +402,12 @@ export default function Dashboard({ initial }: { initial: AppState }) {
                 </button>
               </div>
               <div className="hint">
-                This is the prompt. Edit it mid-run — it takes effect on the next
-                generate phase, so you can steer the machine live.
+                Takes effect on the next generate.
               </div>
             </div>
           </section>
+
+          <PromptsPanel ads={visible} version={state.log.length} />
 
           <ContextPanel context={state.context} post={post} />
         </aside>
@@ -431,9 +431,7 @@ export default function Dashboard({ initial }: { initial: AppState }) {
 
           {visible.length === 0 ? (
             <div className="empty">
-              No ads yet. Press <strong>Run demo</strong> — the machine will
-              research the brand, write its first generation, render creative,
-              place it, and start reading back performance.
+              No ads yet. Press <strong>Run demo</strong>.
             </div>
           ) : (
             <div className="wall">

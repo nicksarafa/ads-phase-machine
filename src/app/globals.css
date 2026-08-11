@@ -266,11 +266,6 @@ select {
 .phase.done .phase-name {
   color: var(--ink-dim);
 }
-.phase-blurb {
-  font-size: 11px;
-  color: var(--ink-faint);
-  line-height: 1.35;
-}
 .phase-bar {
   position: absolute;
   left: 0;
@@ -907,3 +902,62 @@ textarea {
   border: 1px dashed var(--line);
   border-radius: var(--radius-lg);
 }
+
+/* ---------------------------------------------------- prompt library panel */
+/* Rows are dense on purpose: the point of the panel is seeing everything that
+   shapes an ad at once, then opening exactly one thing. */
+.lib-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.lib-item {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg-inset);
+  padding: 6px 8px;
+}
+.lib-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lib-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-name:hover { color: var(--accent); }
+.lib-edit { margin-top: 8px; }
+.lib-pre {
+  margin: 6px 0;
+  padding: 8px;
+  max-height: 240px;
+  overflow: auto;
+  background: var(--bg-inset);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lib-pre.tall { max-height: 420px; }
+.btn.xs {
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.upload { position: relative; cursor: pointer; }

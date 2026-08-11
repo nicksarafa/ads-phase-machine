@@ -41,6 +41,10 @@ export interface GenerateInput {
   losers: Ad[];
   feedbackNotes: { headline: string; rating: number; note: string }[];
   usedHeadlines: string[];
+  /** Ads whose shape to imitate — format only, never wording. */
+  references?: { title: string; body: string }[];
+  /** Bodies of the enabled `prompts/*.md` files, already note-stripped. */
+  files?: string[];
 }
 
 export interface GenerateResult {
@@ -99,6 +103,15 @@ const AD_SCHEMA = {
   },
 } as const;
 
+/**
+ * The exact user prompt the copy model will receive, for the Prompts panel.
+ * Rendering it from the same function the generate phase uses is the point —
+ * a preview assembled separately would drift and quietly start lying.
+ */
+export function previewPrompt(input: GenerateInput): { system: string; user: string } {
+  return { system: SYSTEM, user: buildPrompt(input) };
+}
+
 function buildPrompt(input: GenerateInput): string {
   const parts: string[] = [];
 
@@ -110,11 +123,28 @@ function buildPrompt(input: GenerateInput): string {
   parts.push("");
   parts.push(hookBriefBlock());
 
+  for (const f of input.files ?? []) {
+    parts.push("");
+    parts.push(f);
+  }
+
   const ctx = input.context.filter((c) => c.enabled);
   if (ctx.length) {
     parts.push("");
     parts.push("COLLECTED CONTEXT:");
     for (const c of ctx) parts.push(`- [${c.kind}] ${c.title}: ${c.body}`);
+  }
+
+  if (input.references?.length) {
+    parts.push("");
+    parts.push(
+      "FORMAT REFERENCES — ads whose shape works. Match the structure: line count,",
+      "where the turn lands, how the offer arrives. Never reuse their wording, their",
+      "claims, or their specifics. These are not about our product.",
+    );
+    for (const r of input.references) {
+      parts.push(`--- ${r.title} ---`, r.body.trim());
+    }
   }
 
   if (input.learnings.length) {

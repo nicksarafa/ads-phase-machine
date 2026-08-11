@@ -268,6 +268,12 @@ export interface AppState {
   settings: Settings;
   brief: string;
   context: ContextSource[];
+  /** Ads whose format the copy model should imitate. */
+  references: ReferenceAd[];
+  /** Candidate briefs from "rebuild from winners", held until used. */
+  drafts: PromptDraft[];
+  /** Which `prompts/*.md` files are switched on. */
+  enabledFiles: string[];
   generations: Generation[];
   ads: Record<string, Ad>;
   adOrder: string[];

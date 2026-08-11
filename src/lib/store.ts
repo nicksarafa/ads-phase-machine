@@ -99,6 +99,9 @@ function emptyState(): AppState {
         createdAt: Date.now(),
       },
     ],
+    references: [],
+    drafts: [],
+    enabledFiles: ["design.md"],
     generations: [],
     ads: {},
     adOrder: [],
@@ -139,6 +142,12 @@ export function loadState(): AppState {
       const raw = JSON.parse(fs.readFileSync(STATE_FILE, "utf8")) as AppState;
       if (raw.version === STATE_VERSION) {
         slot.state = raw;
+        // Backfill fields added after this state file was written. Bumping the
+        // version instead would be correct but would throw away a long run's
+        // worth of ads and measured insight, which is the whole demo.
+        slot.state.references ??= [];
+        slot.state.drafts ??= [];
+        slot.state.enabledFiles ??= ["design.md"];
         // A process restart always stops the loop; the UI can start it again.
         slot.state.machine.running = false;
         slot.state.machine.phase = "idle";
