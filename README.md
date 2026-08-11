@@ -165,7 +165,7 @@ All optional. See `.env.example`.
 | `ADS_LLM_TIMEOUT_MS` | Copy-generation ceiling before the offline fallback. Default 100000. |
 | `ADS_IMAGE_PROVIDER` | `auto` \| `google` \| `openai` \| `claude-mcp` \| `procedural`. |
 | `GEMINI_API_KEY` | Google "Nano Banana Pro" images. [Get one here](https://aistudio.google.com/apikey). |
-| `GEMINI_IMAGE_MODEL` | Default `gemini-3-pro-image-preview`. |
+| `GEMINI_IMAGE_MODEL` | Default `gemini-3-pro-image`. Set `gemini-3.1-flash-image` for faster, cheaper renders. |
 | `OPENAI_API_KEY` | Enables the OpenAI images path. |
 | `ADS_IMAGE_CONCURRENCY` | Parallel AI image renders. Default 2. |
 

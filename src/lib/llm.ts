@@ -386,6 +386,9 @@ export async function generateAds(input: GenerateInput): Promise<GenerateResult>
     try {
       return await withDeadline(viaAnthropic(input), deadline - Date.now(), "anthropic");
     } catch (e) {
+      // The CLI usually rescues this, which hides a broken key or a rejected
+      // request behind a slower path — say so rather than falling through mute.
+      console.warn(`[llm] anthropic failed, falling back — ${msgOf(e)}`);
       errors.push(`anthropic: ${msgOf(e)}`);
     }
   }

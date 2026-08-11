@@ -17,9 +17,14 @@ import type { Genes } from "./types";
 
 export type ImageProvider = "google" | "openai" | "claude-mcp" | "procedural";
 
-/** "Nano Banana Pro" is Google's image model on the Gemini API. */
+/**
+ * "Nano Banana Pro" is Google's image model on the Gemini API. The preview
+ * alias it shipped under is retired — the GA id has no `-preview` suffix, and
+ * asking for the old one 404s on every ad. `gemini-3.1-flash-image` ("Nano
+ * Banana 2") is the cheaper, faster sibling if a cycle of six is too slow.
+ */
 const GOOGLE_IMAGE_MODEL =
-  process.env.GEMINI_IMAGE_MODEL || "gemini-3-pro-image-preview";
+  process.env.GEMINI_IMAGE_MODEL || "gemini-3-pro-image";
 
 function googleKey() {
   return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
@@ -177,7 +182,7 @@ export function demotedProviders(): string[] {
 
 /**
  * Google's Gemini image models ("Nano Banana Pro"). Returns the image inline as
- * base64 on the generateContent response rather than as a URL to fetch.
+ * base64 on the Interactions response rather than as a URL to fetch.
  */
 async function renderGoogle(
   adId: string,
@@ -187,48 +192,42 @@ async function renderGoogle(
   const key = googleKey();
   if (!key) throw new Error("GEMINI_API_KEY is not set");
 
-  // AI Studio keys start with AIza. A Google Labs `AQ.` token authenticates
-  // against models.list but is not entitled to call generateContent, which
-  // surfaces as an empty-bodied 404 on every single ad — fail fast instead.
-  if (!key.startsWith("AIza")) {
-    throw new Error(
-      "403 GEMINI_API_KEY is not an AI Studio key (expected AIza…, got " +
-        `${key.slice(0, 3)}…). Create one at https://aistudio.google.com/apikey`,
-    );
-  }
+  // No prefix check here. `AIza` and `AQ.` keys both generate fine — the 404s
+  // once blamed on the token type were the retired model alias and the old
+  // generateContent route, and rejecting `AQ.` keys turned a working key away.
 
+  // Image generation lives on the Interactions API — the old
+  // models/{model}:generateContent route no longer serves image modalities.
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_IMAGE_MODEL}:generateContent`,
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
     {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            // Nano Banana Pro renders a supplied mark far more faithfully than
-            // it renders one described in words, so pass the real PNG.
-            parts: [
-              ...(withLogo && brandMark()
-                ? [
-                    {
-                      inlineData: {
-                        mimeType: "image/png",
-                        data: brandMark() as string,
-                      },
-                    },
-                    {
-                      text: "Reference image: the Light School logo. Reproduce it exactly as given — do not redraw, restyle or add text to it.",
-                    },
-                  ]
-                : []),
-              { text: prompt },
-            ],
-          },
+        model: GOOGLE_IMAGE_MODEL,
+        // Nano Banana Pro renders a supplied mark far more faithfully than it
+        // renders one described in words, so pass the real PNG.
+        input: [
+          { type: "text", text: prompt },
+          ...(withLogo && brandMark()
+            ? [
+                {
+                  type: "text",
+                  text: "Reference image: the Light School logo. Reproduce it exactly as given — do not redraw, restyle or add text to it.",
+                },
+                {
+                  type: "image",
+                  mime_type: "image/png",
+                  data: brandMark() as string,
+                },
+              ]
+            : []),
         ],
-        generationConfig: {
-          responseModalities: ["IMAGE"],
-          imageConfig: { aspectRatio: "1:1" },
+        response_format: {
+          type: "image",
+          mime_type: "image/jpeg",
+          aspect_ratio: "1:1",
+          image_size: "1K",
         },
       }),
       signal: AbortSignal.timeout(180_000),
@@ -241,29 +240,34 @@ async function renderGoogle(
     );
   }
 
+  // Everything the model did is a step on a timeline; the picture is an image
+  // block inside one of them.
   const json = (await res.json()) as {
-    candidates?: {
-      finishReason?: string;
-      content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] };
+    steps?: {
+      type?: string;
+      status?: string;
+      content?: { type?: string; mime_type?: string; data?: string; text?: string }[];
     }[];
-    promptFeedback?: { blockReason?: string };
   };
 
-  const candidate = json.candidates?.[0];
-  const inline = candidate?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
+  const inline = json.steps
+    ?.flatMap((s) => s.content ?? [])
+    .find((c) => c.type === "image" && c.data);
 
   if (!inline?.data) {
+    // A refusal comes back as text where the image should have been — surface
+    // it rather than a bare "no image".
     const why =
-      json.promptFeedback?.blockReason ??
-      candidate?.finishReason ??
-      "no inline image in response";
+      json.steps
+        ?.flatMap((s) => s.content ?? [])
+        .find((c) => c.type === "text" && c.text)
+        ?.text?.slice(0, 160) ?? "no image block in response";
     throw new Error(`gemini returned no image (${why})`);
   }
 
-
-  const ext = (inline.mimeType ?? "").includes("jpeg")
+  const ext = (inline.mime_type ?? "").includes("jpeg")
     ? "jpg"
-    : (inline.mimeType ?? "").includes("webp")
+    : (inline.mime_type ?? "").includes("webp")
       ? "webp"
       : "png";
   fs.mkdirSync(IMAGE_DIR, { recursive: true });
