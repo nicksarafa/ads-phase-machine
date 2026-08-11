@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-labelledby="logo-title">
+  <title id="logo-title">LightSchool</title>
+  <defs>
+    <!-- Slight concavity diamond (barely curved) -->
+    <path id="diamond" d="M 200,155 C 199,178 178,199 155,200 C 178,201 199,222 200,245 C 201,222 222,201 245,200 C 222,199 201,178 200,155 Z"/>
+
+    <filter id="glow-xl" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="30"/>
+    </filter>
+    <filter id="glow-lg" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <filter id="glow-md" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <filter id="glow-sm" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+    <filter id="ray-blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.2"/>
+    </filter>
+
+    <radialGradient id="bg-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#14103A"/>
+      <stop offset="25%" stop-color="#0C0A20"/>
+      <stop offset="100%" stop-color="#050208"/>
+    </radialGradient>
+
+    <linearGradient id="ray-white" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="25%" stop-color="#FFFFFF" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#C0CCFF" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#8090CC" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="ray-blue" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#5577FF" stop-opacity="0.9"/>
+      <stop offset="25%" stop-color="#4466EE" stop-opacity="0.5"/>
+      <stop offset="60%" stop-color="#3355CC" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#2244AA" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="ray-pink" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#FF5577" stop-opacity="0.7"/>
+      <stop offset="25%" stop-color="#EE4466" stop-opacity="0.35"/>
+      <stop offset="60%" stop-color="#CC3355" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#AA2244" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="ray-violet" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#AA66FF" stop-opacity="0.5"/>
+      <stop offset="25%" stop-color="#8855DD" stop-opacity="0.25"/>
+      <stop offset="60%" stop-color="#6644BB" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#442288" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="400" height="400" fill="#050208"/>
+
+  <!-- Atmospheric halo -->
+  <circle cx="200" cy="200" r="160" fill="#5060AA" opacity="0.05" filter="url(#glow-xl)"/>
+  <circle cx="200" cy="200" r="90" fill="#7080CC" opacity="0.08" filter="url(#glow-lg)"/>
+
+  <!-- Rays - 6 angles with wider chromatic spread -->
+  <g filter="url(#ray-blur)">
+    <!-- Ray 1: 0° -->
+    <polygon points="198,195 198.5,10 200,195" fill="url(#ray-blue)" transform="rotate(0,200,200)" opacity="0.75"/>
+    <polygon points="200,195 201.5,10 202,195" fill="url(#ray-pink)" transform="rotate(0,200,200)" opacity="0.55"/>
+    <polygon points="199,195 200,10 201,195" fill="url(#ray-white)" transform="rotate(0,200,200)" opacity="0.65"/>
+    <polygon points="197.5,195 198,15 199,195" fill="url(#ray-violet)" transform="rotate(0,200,200)" opacity="0.3"/>
+
+    <!-- Ray 2: 60° -->
+    <polygon points="198,195 198.5,10 200,195" fill="url(#ray-blue)" transform="rotate(60,200,200)" opacity="0.7"/>
+    <polygon points="200,195 201.5,10 202,195" fill="url(#ray-pink)" transform="rotate(60,200,200)" opacity="0.5"/>
+    <polygon points="199,195 200,10 201,195" fill="url(#ray-white)" transform="rotate(60,200,200)" opacity="0.55"/>
+    <polygon points="197.5,195 198,15 199,195" fill="url(#ray-violet)" transform="rotate(60,200,200)" opacity="0.25"/>
+
+    <!-- Ray 3: 120° -->
+    <polygon points="198,195 198.5,20 200,195" fill="url(#ray-blue)" transform="rotate(120,200,200)" opacity="0.65"/>
+    <polygon points="200,195 201.5,20 202,195" fill="url(#ray-pink)" transform="rotate(120,200,200)" opacity="0.45"/>
+    <polygon points="199,195 200,20 201,195" fill="url(#ray-white)" transform="rotate(120,200,200)" opacity="0.5"/>
+
+    <!-- Ray 4: 180° -->
+    <polygon points="198,195 198.5,10 200,195" fill="url(#ray-blue)" transform="rotate(180,200,200)" opacity="0.7"/>
+    <polygon points="200,195 201.5,10 202,195" fill="url(#ray-pink)" transform="rotate(180,200,200)" opacity="0.55"/>
+    <polygon points="199,195 200,10 201,195" fill="url(#ray-white)" transform="rotate(180,200,200)" opacity="0.6"/>
+    <polygon points="197.5,195 198,15 199,195" fill="url(#ray-violet)" transform="rotate(180,200,200)" opacity="0.3"/>
+
+    <!-- Ray 5: 240° -->
+    <polygon points="198,195 198.5,25 200,195" fill="url(#ray-blue)" transform="rotate(240,200,200)" opacity="0.6"/>
+    <polygon points="200,195 201.5,25 202,195" fill="url(#ray-pink)" transform="rotate(240,200,200)" opacity="0.4"/>
+    <polygon points="199,195 200,25 201,195" fill="url(#ray-white)" transform="rotate(240,200,200)" opacity="0.5"/>
+
+    <!-- Ray 6: 300° -->
+    <polygon points="198,195 198.5,15 200,195" fill="url(#ray-blue)" transform="rotate(300,200,200)" opacity="0.7"/>
+    <polygon points="200,195 201.5,15 202,195" fill="url(#ray-pink)" transform="rotate(300,200,200)" opacity="0.5"/>
+    <polygon points="199,195 200,15 201,195" fill="url(#ray-white)" transform="rotate(300,200,200)" opacity="0.55"/>
+    <polygon points="197.5,195 198,20 199,195" fill="url(#ray-violet)" transform="rotate(300,200,200)" opacity="0.2"/>
+  </g>
+
+  <!-- Prismatic glow - blue -->
+  <use href="#diamond" fill="#3355FF" opacity="0.35" transform="translate(-5,-2)" filter="url(#glow-lg)"/>
+
+  <!-- Prismatic glow - pink -->
+  <use href="#diamond" fill="#FF3366" opacity="0.25" transform="translate(5,2)" filter="url(#glow-lg)"/>
+
+  <!-- White glow -->
+  <circle cx="200" cy="200" r="30" fill="white" opacity="0.3" filter="url(#glow-md)"/>
+
+  <!-- Diamond glow -->
+  <use href="#diamond" fill="white" opacity="0.45" filter="url(#glow-sm)"/>
+
+  <!-- Diamond subtle fill -->
+  <use href="#diamond" fill="white" opacity="0.12"/>
+
+  <!-- Bright center square -->
+  <rect x="192" y="192" width="16" height="16" fill="white"/>
+</svg>
