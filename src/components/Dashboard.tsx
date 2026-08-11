@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdCard from "./AdCard";
 import PhaseRail from "./PhaseRail";
 import PerfChart from "./PerfChart";
-import PromptsPanel from "./PromptsPanel";
+import Link from "next/link";
 import { clock, hours, int, money, mult, pct } from "@/lib/format";
 import {
   PHASE_LABELS,
@@ -123,6 +123,10 @@ export default function Dashboard({ initial }: { initial: AppState }) {
           <h1>Ads Phase Machine</h1>
           <span>lightschool.com · simulated Meta account</span>
         </div>
+
+        <Link className="btn" href="/prompts">
+          Prompts
+        </Link>
 
         <div className="statuspill">
           <span className={`dot ${m.running ? "live" : ""}`} />
@@ -406,8 +410,6 @@ export default function Dashboard({ initial }: { initial: AppState }) {
               </div>
             </div>
           </section>
-
-          <PromptsPanel ads={visible} version={state.log.length} />
 
           <ContextPanel context={state.context} post={post} />
         </aside>

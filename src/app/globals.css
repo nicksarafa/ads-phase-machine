@@ -961,3 +961,9 @@ textarea {
   line-height: 1.6;
 }
 .upload { position: relative; cursor: pointer; }
+
+.prompt-screen {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
