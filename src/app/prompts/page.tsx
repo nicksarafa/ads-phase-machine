@@ -1,5 +1,4 @@
-import Link from "next/link";
-import PromptsPanel from "@/components/PromptsPanel";
+import PromptsScreen from "@/components/PromptsScreen";
 import { getState } from "@/lib/store";
 import type { Ad } from "@/lib/types";
 
@@ -19,22 +18,5 @@ export default function PromptsPage() {
     .filter((a): a is Ad => Boolean(a) && a.status === "active")
     .slice(0, 60);
 
-  return (
-    <div className="shell">
-      <header className="topbar">
-        <div className="brand">
-          <h1>Prompts</h1>
-          <span>files, format references, and the prompt they build</span>
-        </div>
-        <span className="spacer" style={{ flex: 1 }} />
-        <Link className="btn" href="/">
-          ← Back to the wall
-        </Link>
-      </header>
-
-      <div className="prompt-screen">
-        <PromptsPanel ads={JSON.parse(JSON.stringify(ads))} version={0} />
-      </div>
-    </div>
-  );
+  return <PromptsScreen ads={JSON.parse(JSON.stringify(ads))} />;
 }

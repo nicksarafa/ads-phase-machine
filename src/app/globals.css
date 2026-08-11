@@ -3,6 +3,61 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 
+/* Tailwind v4 + shadcn. The theme variables below are bound to the same dark
+   palette the hand-written CSS already uses, so a shadcn primitive dropped
+   into a legacy panel matches it. Both stylesheets coexist deliberately while
+   screens are migrated one at a time. */
+@import "tailwindcss";
+
+:root {
+  --radius: 0.625rem;
+  --background: #08090b;
+  --foreground: #e8ecf1;
+  --card: #111419;
+  --card-foreground: #e8ecf1;
+  --popover: #0e1014;
+  --popover-foreground: #e8ecf1;
+  --primary: #6868e8;
+  --primary-foreground: #ffffff;
+  --secondary: #171b22;
+  --secondary-foreground: #e8ecf1;
+  --muted: #0a0c0f;
+  --muted-foreground: #9aa4b2;
+  --accent: #171b22;
+  --accent-foreground: #e8ecf1;
+  --destructive: #ff5d73;
+  --border: #1e232b;
+  --input: #1e232b;
+  --ring: #6868e8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
 /* ---------------------------------------------------------------- tokens */
 
 :root {
