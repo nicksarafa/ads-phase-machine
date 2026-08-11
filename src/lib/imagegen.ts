@@ -3,6 +3,7 @@ import path from "node:path";
 import { IMAGE_DIR } from "./store";
 import { hasBinary, run } from "./llm";
 import { BRAND_STYLE } from "./brand";
+import { designDirection } from "./library";
 import type { Genes } from "./types";
 
 /**
@@ -123,7 +124,9 @@ export function brandedPrompt(prompt: string, withLogo: boolean): string {
   return [
     prompt,
     "",
-    BRAND_STYLE.artDirection,
+    // `prompts/design.md` owns the house look; the constant is the fallback so
+    // an emptied or missing file can never stop the wall rendering mid-demo.
+    designDirection(BRAND_STYLE.artDirection),
     withLogo
       ? `Place ${BRAND_STYLE.markDescription} small and unobtrusive in one corner, as a real brand would — roughly 8% of the frame, correct proportions, no other text or lettering anywhere.`
       : "No text, letters, words, logos or watermarks anywhere in the image.",

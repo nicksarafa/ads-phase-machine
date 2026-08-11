@@ -182,6 +182,31 @@ export interface ContextSource {
   createdAt: number;
 }
 
+/**
+ * An ad whose *shape* should be copied — pasted in, or captured off the wall.
+ * The model is told to match the structure and never the wording, so a
+ * reference is a format exemplar rather than a source of copy.
+ */
+export interface ReferenceAd {
+  id: string;
+  title: string;
+  body: string;
+  source: "pasted" | "captured";
+  enabled: boolean;
+  createdAt: number;
+}
+
+/** A candidate brief, produced by the rebuild button, held until it is used. */
+export interface PromptDraft {
+  id: string;
+  title: string;
+  body: string;
+  source: "winners" | "manual";
+  /** Headlines the draft was synthesised from, so its basis stays auditable. */
+  basis: string[];
+  createdAt: number;
+}
+
 export interface Settings {
   /** Ads produced per cycle. */
   adsPerCycle: number;
