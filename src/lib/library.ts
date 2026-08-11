@@ -123,6 +123,22 @@ export function deletePromptFile(name: string): boolean {
 }
 
 /**
+ * Files that replace a built-in section of the prompt rather than adding to
+ * it. They are always in play, so they are never listed as toggleable extras.
+ */
+export const SECTION_FILES = ["design.md", "brand-block.md", "hook-patterns.md"];
+
+/**
+ * A prompt section, overridden by a file when one exists. The code default is
+ * the fallback so emptying or deleting a file degrades to the built-in text
+ * rather than punching a hole in the prompt.
+ */
+export function sectionOr(name: string, fallback: string): string {
+  const f = readPromptFile(name);
+  return f?.body ? f.body : fallback;
+}
+
+/**
  * Art direction for image prompts. `design.md` owns this; the built-in string
  * is the fallback so a missing or emptied file can never stop the wall from
  * rendering mid-demo.
@@ -135,7 +151,7 @@ export function designDirection(fallback: string): string {
 /** Extra files the operator has switched on, as prompt-ready blocks. */
 export function extraContextBlocks(enabled: string[]): string[] {
   return enabled
-    .filter((n) => n !== "design.md")
+    .filter((n) => !SECTION_FILES.includes(n))
     .map((n) => readPromptFile(n))
     .filter((f): f is PromptFile => f !== null && f.body.length > 0)
     .map((f) => `[${f.title}]\n${f.body}`);

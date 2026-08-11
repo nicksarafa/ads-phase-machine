@@ -34,9 +34,9 @@ export const BRAND = {
   name: "Light School",
   url: "https://lightschool.com",
   oneLiner:
-    "Hands-on AI education: workshops, team training, and free lessons for people who want to build real things with AI.",
+    "Hands-on AI training for teams: a live session where a company's own problem gets built, and keeps running afterwards.",
   audience:
-    "Non-technical professionals, founders, and operators who want to build working AI projects for actual business problems — not theory.",
+    "Business owners, founders and department heads deciding whether to upgrade their existing team's capability — the person who owns the budget and the outcome, not an individual learner.",
   teacher:
     "Taught by Nick Sarafa, a 15-year software veteran and former CTO.",
   proof: [
@@ -46,29 +46,11 @@ export const BRAND = {
     "Student builds include booking systems, dashboards, trading bots, and automation workflows",
   ],
   offers: {
-    "free-lesson": {
-      label: "Free lesson / Campus",
-      cta: "Start for Free",
-      landing: "https://lightschool.com/campus",
-      note: "Free setup guides and tutorials. Lowest friction entry point.",
-    },
-    workshop: {
-      label: "AI Workshop",
-      cta: "Join a Workshop",
-      landing: "https://lightschool.com/workshops",
-      note: "Online on Wednesdays, in person in Lisbon. Build a real project live.",
-    },
     "team-training": {
       label: "Team training",
       cta: "Train Your Team",
       landing: "https://lightschool.com/teams",
-      note: "Custom programs for companies. High value, low volume, long cycle.",
-    },
-    campus: {
-      label: "Campus membership",
-      cta: "Explore Campus",
-      landing: "https://lightschool.com/campus",
-      note: "Ongoing lessons and setup guides.",
+      note: "Custom programs for companies. The only offer this account sells.",
     },
   },
   voice:

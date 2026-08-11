@@ -24,15 +24,19 @@ export const DEFAULT_SETTINGS: Settings = {
   imageMode: "ai",
   stepMode: false,
   killThreshold: 0.4,
-  offerFocus: "auto",
+  offerFocus: "team-training",
   brandLogo: true,
 };
 
 export const DEFAULT_BRIEF = `You are the creative strategist for Light School's paid acquisition on Meta.
 
-Goal: get a decision-maker to book team training, or to start the free lessons
-themselves and bring the team later. The winning ad is the one that makes a
-specific person think "that's my team, and we could actually build that."
+Goal: get a business owner or department head to book team training. This
+account sells one thing — upgrading a team that already exists. Never pitch a
+free lesson, a self-serve course, or anything an individual buys for
+themselves. The winning ad is the one that makes an owner think "that's my
+team, and we could actually build that."
+
+Write to the person who owns the budget and the outcome, not to the learner.
 
 Write in English only.
 

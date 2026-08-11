@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { GENE_SPACE, type Ad, type GeneKey, type Genes } from "./types";
 import { BRAND, brandBlock } from "./brand";
 import { hookBriefBlock } from "./hooks";
+import { sectionOr } from "./library";
 import type { ContextSource, GeneInsight } from "./types";
 
 /**
@@ -120,13 +121,13 @@ export function previewPrompt(input: GenerateInput): { system: string; user: str
 function buildPrompt(input: GenerateInput): string {
   const parts: string[] = [];
 
-  parts.push(brandBlock());
+  parts.push(sectionOr("brand-block.md", brandBlock()));
   parts.push("");
   parts.push("OPERATOR BRIEF (this is the current prompt, edited live in the UI):");
   parts.push(input.brief.trim());
 
   parts.push("");
-  parts.push(hookBriefBlock());
+  parts.push(sectionOr("hook-patterns.md", hookBriefBlock()));
 
   for (const f of input.files ?? []) {
     parts.push("");

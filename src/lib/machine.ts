@@ -305,8 +305,9 @@ async function phaseGenerate(token: number): Promise<Generation | null> {
   const cycleStamp = s.machine.cycle;
   const focus = s.settings.offerFocus;
   result.ads.forEach((draft, i) => {
-    // A pinned campaign is a hard constraint, not a suggestion to the model.
-    if (focus !== "auto") draft.genes = { ...draft.genes, offer: focus };
+    // The account sells one offer, so this is a hard constraint rather than a
+    // suggestion — the model does not get to wander back to a consumer offer.
+    draft.genes = { ...draft.genes, offer: focus };
     const id = nextAdId();
     const ad: Ad = {
       id,

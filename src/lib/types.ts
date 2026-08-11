@@ -72,7 +72,9 @@ export const GENE_SPACE = {
     "workshop-scene",
   ],
   tone: ["warm", "urgent", "analytical", "playful", "authoritative"],
-  offer: ["free-lesson", "workshop", "team-training", "campus"],
+  // Team training only. The account sells to business owners upgrading a
+  // team; consumer-entry offers pulled the copy toward individuals.
+  offer: ["team-training"],
 } as const;
 
 export type GeneKey = keyof typeof GENE_SPACE;
@@ -227,7 +229,7 @@ export interface Settings {
   /** Kill ads whose score falls below this percentile of the cycle. */
   killThreshold: number;
   /** Pin the campaign to one offer, or let the machine pick per ad. */
-  offerFocus: "auto" | "team-training" | "workshop" | "free-lesson" | "campus";
+  offerFocus: "team-training";
   /** Ask the image model to place the Light School mark in the creative. */
   brandLogo: boolean;
 }
