@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AdCard from "./AdCard";
 import PhaseRail from "./PhaseRail";
 import PerfChart from "./PerfChart";
@@ -9,7 +9,6 @@ import { clock, hours, int, money, mult, pct } from "@/lib/format";
 import {
   PHASE_LABELS,
   type AppState,
-  type ContextSource,
   type Settings,
 } from "@/lib/types";
 
@@ -19,15 +18,6 @@ export default function Dashboard({ initial }: { initial: AppState }) {
   const [state, setState] = useState<AppState>(initial);
   const [connected, setConnected] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
-  const [brief, setBrief] = useState(initial.brief);
-  const [briefDirty, setBriefDirty] = useState(false);
-  const briefRef = useRef(initial.brief);
-  const briefDirtyRef = useRef(false);
-
-  useEffect(() => {
-    briefDirtyRef.current = briefDirty;
-  }, [briefDirty]);
-
   // ------------------------------------------------------------ live feed
   useEffect(() => {
     const es = new EventSource("/api/stream");
@@ -35,11 +25,6 @@ export default function Dashboard({ initial }: { initial: AppState }) {
     es.addEventListener("state", (e) => {
       const next = JSON.parse((e as MessageEvent).data) as AppState;
       setState(next);
-      // Never stomp on text the operator is mid-edit.
-      if (!briefDirtyRef.current && next.brief !== briefRef.current) {
-        briefRef.current = next.brief;
-        setBrief(next.brief);
-      }
     });
     es.onerror = () => setConnected(false);
     return () => es.close();
@@ -71,11 +56,6 @@ export default function Dashboard({ initial }: { initial: AppState }) {
     [post],
   );
 
-  const saveBrief = useCallback(async () => {
-    await post("/api/brief", { brief }, "PUT");
-    briefRef.current = brief;
-    setBriefDirty(false);
-  }, [brief, post]);
 
   // --------------------------------------------------------------- derived
   const ads = useMemo(
@@ -349,42 +329,6 @@ export default function Dashboard({ initial }: { initial: AppState }) {
             </div>
           </section>
 
-          <section className="panel">
-            <div className="panel-head">
-              <h2>Creative brief</h2>
-              <span className="spacer" />
-              {briefDirty && <span className="tag warn">unsaved</span>}
-            </div>
-            <div className="panel-body">
-              <textarea
-                rows={14}
-                value={brief}
-                onChange={(e) => {
-                  setBrief(e.target.value);
-                  setBriefDirty(true);
-                }}
-              />
-              <div className="row">
-                <button className="btn primary sm" onClick={saveBrief} disabled={!briefDirty}>
-                  Save brief
-                </button>
-                <button
-                  className="btn sm"
-                  onClick={async () => {
-                    await post("/api/brief", { reset: true }, "PUT");
-                    setBriefDirty(false);
-                  }}
-                >
-                  Restore default
-                </button>
-              </div>
-              <div className="hint">
-                Takes effect on the next generate.
-              </div>
-            </div>
-          </section>
-
-          <ContextPanel context={state.context} post={post} />
         </aside>
 
         {/* ------------------------------------------------------ centre col */}
@@ -535,112 +479,3 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
   );
 }
 
-function ContextPanel({
-  context,
-  post,
-}: {
-  context: ContextSource[];
-  post: (url: string, body: unknown, method?: string) => Promise<void>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [kind, setKind] = useState<ContextSource["kind"]>("note");
-  const [busy, setBusy] = useState(false);
-
-  return (
-    <section className="panel">
-      <div className="panel-head">
-        <h2>Collected context</h2>
-        <span className="spacer" />
-        <button className="btn sm" onClick={() => setOpen((v) => !v)}>
-          {open ? "close" : "+ add"}
-        </button>
-      </div>
-
-      {open && (
-        <div className="panel-body">
-          <div className="field">
-            <label>Kind</label>
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as ContextSource["kind"])}
-            >
-              <option value="note">note</option>
-              <option value="url">url (fetched and read)</option>
-              <option value="audience">audience insight</option>
-              <option value="proof">proof / testimonial</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="What is this?"
-            />
-          </div>
-          <div className="field">
-            <label>{kind === "url" ? "URL" : "Body"}</label>
-            <textarea
-              rows={3}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder={
-                kind === "url"
-                  ? "https://lightschool.com/workshops"
-                  : "Anything the copywriter should know."
-              }
-            />
-          </div>
-          <button
-            className="btn primary sm"
-            disabled={busy || !title.trim() || !body.trim()}
-            onClick={async () => {
-              setBusy(true);
-              await post("/api/context", { title, body, kind });
-              setTitle("");
-              setBody("");
-              setOpen(false);
-              setBusy(false);
-            }}
-          >
-            {busy ? "Adding…" : "Add source"}
-          </button>
-        </div>
-      )}
-
-      <div className="panel-body tight">
-        {context.length === 0 && (
-          <div className="hint" style={{ padding: "16px 14px" }}>
-            No sources. Everything the copywriter knows comes from the brand
-            profile alone.
-          </div>
-        )}
-        {context.map((c) => (
-          <div className={`ctxitem ${c.enabled ? "" : "off"}`} key={c.id}>
-            <button
-              className={`switch ${c.enabled ? "on" : ""}`}
-              aria-label="toggle"
-              onClick={() => post("/api/context", { op: "toggle", id: c.id })}
-            />
-            <div className="body">
-              <div className="title">
-                {c.title} <span className="tag">{c.kind}</span>
-              </div>
-              <div className="text">{c.body}</div>
-            </div>
-            <button
-              className="btn sm icon"
-              onClick={() => post("/api/context", { op: "delete", id: c.id })}
-              title="remove"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}

@@ -35,6 +35,7 @@ function payload() {
   const { system, user } = previewPrompt(input);
   return {
     brief: s.brief,
+    context: s.context,
     files: listPromptFiles().map((f) => ({
       ...f,
       enabled: s.enabledFiles.includes(f.name),

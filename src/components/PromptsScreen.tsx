@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import type { Ad, PromptDraft, ReferenceAd } from "@/lib/types";
+import type { Ad, ContextSource, PromptDraft, ReferenceAd } from "@/lib/types";
 
 interface LibraryFile {
   name: string;
@@ -23,6 +23,7 @@ interface LibraryFile {
 
 interface Payload {
   brief: string;
+  context: ContextSource[];
   files: LibraryFile[];
   references: ReferenceAd[];
   drafts: PromptDraft[];
@@ -42,6 +43,9 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
   const [newTitle, setNewTitle] = useState("");
   const [refTitle, setRefTitle] = useState("");
   const [refBody, setRefBody] = useState("");
+  const [ctxTitle, setCtxTitle] = useState("");
+  const [ctxBody, setCtxBody] = useState("");
+  const [ctxKind, setCtxKind] = useState<ContextSource["kind"]>("note");
   const [brief, setBrief] = useState("");
   const [briefDirty, setBriefDirty] = useState(false);
 
@@ -82,6 +86,24 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
       }
     },
     [act],
+  );
+
+  /** Context lives on its own endpoint; refresh the payload after each call. */
+  const ctxAct = useCallback(
+    async (payload: Record<string, unknown>) => {
+      setBusy(true);
+      try {
+        await fetch("/api/context", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        await load();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load],
   );
 
   /** Read an image in the browser and post it as a data URL. */
@@ -128,6 +150,7 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
           <TabsList>
             <TabsTrigger value="brief">Brief</TabsTrigger>
             <TabsTrigger value="files">Files</TabsTrigger>
+            <TabsTrigger value="context">Context</TabsTrigger>
             <TabsTrigger value="refs">Ads I like</TabsTrigger>
           </TabsList>
 
@@ -260,6 +283,70 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
             <p className="text-xs text-muted-foreground">
               Real files in <code>prompts/</code>. Ticked ones go into every generate.
             </p>
+          </TabsContent>
+
+          <TabsContent value="context" className="mt-4 space-y-2">
+            {data?.context.map((c) => (
+              <Card key={c.id} className="py-0">
+                <CardContent className="flex items-start gap-3 p-3">
+                  <Checkbox
+                    className="mt-1"
+                    checked={c.enabled}
+                    onCheckedChange={() => ctxAct({ op: "toggle", id: c.id })}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm">{c.title}</span>
+                      <Badge variant="secondary">{c.kind}</Badge>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                      {c.body}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => ctxAct({ op: "delete", id: c.id })}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+
+            <div className="flex gap-2">
+              <select
+                className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                value={ctxKind}
+                onChange={(e) => setCtxKind(e.target.value as ContextSource["kind"])}
+              >
+                <option value="note">note</option>
+                <option value="url">url (fetched and read)</option>
+                <option value="audience">audience insight</option>
+                <option value="proof">proof / testimonial</option>
+              </select>
+              <Input
+                placeholder="Title"
+                value={ctxTitle}
+                onChange={(e) => setCtxTitle(e.target.value)}
+              />
+            </div>
+            <Textarea
+              rows={4}
+              placeholder={ctxKind === "url" ? "https://…" : "What the machine should know…"}
+              value={ctxBody}
+              onChange={(e) => setCtxBody(e.target.value)}
+            />
+            <Button
+              disabled={!ctxTitle.trim() || !ctxBody.trim() || busy}
+              onClick={async () => {
+                await ctxAct({ title: ctxTitle, body: ctxBody, kind: ctxKind });
+                setCtxTitle("");
+                setCtxBody("");
+              }}
+            >
+              {busy ? "Adding…" : "Add context"}
+            </Button>
           </TabsContent>
 
           <TabsContent value="refs" className="mt-4 space-y-2">
