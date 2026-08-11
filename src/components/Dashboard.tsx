@@ -128,51 +128,47 @@ export default function Dashboard({ initial }: { initial: AppState }) {
           Prompts
         </Link>
 
-        <div className="statuspill">
+        {/* Status is three dots and a phase name. The pills that used to spell
+            out cycle, clock, providers and key presence were the densest copy
+            on the page, and all of it is in the machine log already. */}
+        <div className="statuspill" title={`cycle ${m.cycle + 1} · T+${hours(m.clockHours)}`}>
           <span className={`dot ${m.running ? "live" : ""}`} />
           {m.running ? PHASE_LABELS[m.phase] : "Paused"}
-          <span style={{ color: "var(--ink-faint)" }}>
-            · cycle {m.cycle + 1} · T+{hours(m.clockHours)}
-          </span>
         </div>
 
-        <div className="statuspill" title="Where copy and images are coming from">
+        <div
+          className="statuspill"
+          title={[
+            `copy: ${m.llmProvider ?? "not run yet"}`,
+            m.imageProvider ? `images: ${m.imageProvider}` : null,
+            m.credentials
+              ? `keys: anthropic ${m.credentials.anthropic ? "✓" : "✗"}, gemini ${m.credentials.gemini ? "✓" : "✗"}`
+              : null,
+            m.prefetch !== "none" ? `next batch: ${m.prefetch}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        >
           <span className="dot" style={{ background: connected ? "var(--info)" : "var(--bad)" }} />
-          {m.llmProvider ?? "copy: not run yet"}
-          {m.imageProvider ? ` · img: ${m.imageProvider}` : ""}
-        </div>
-
-        {m.credentials && (
-          <div
-            className="statuspill"
-            title="Keys this server process can see. Next reads .env once at boot — edit it and restart."
-          >
-            <span
-              className="dot"
-              style={{
-                background: m.credentials.anthropic ? "var(--good)" : "var(--ink-faint)",
-              }}
-            />
-            key: {m.credentials.anthropic ? "anthropic ✓" : "anthropic ✗"}
-            {" · "}
-            {m.credentials.gemini ? "gemini ✓" : "gemini ✗"}
-          </div>
-        )}
-
-        {m.prefetch !== "none" && (
-          <div
-            className="statuspill"
-            title="The next batch of copy is written ahead of time so the generate phase never stalls"
-          >
+          <span
+            className="dot"
+            style={{
+              background: m.credentials?.anthropic ? "var(--good)" : "var(--ink-faint)",
+            }}
+          />
+          <span
+            className="dot"
+            style={{
+              background: m.credentials?.gemini ? "var(--good)" : "var(--ink-faint)",
+            }}
+          />
+          {m.prefetch !== "none" && (
             <span
               className={`dot ${m.prefetch === "writing" ? "live" : ""}`}
-              style={{
-                background: m.prefetch === "ready" ? "var(--good)" : "var(--warn)",
-              }}
+              style={{ background: m.prefetch === "ready" ? "var(--good)" : "var(--warn)" }}
             />
-            {m.prefetch === "ready" ? "next batch ready" : "pre-writing next batch"}
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="topbar-spacer" />
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Sparkles, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, ImagePlus, Plus, Sparkles, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,7 @@ interface LibraryFile {
 }
 
 interface Payload {
+  brief: string;
   files: LibraryFile[];
   references: ReferenceAd[];
   drafts: PromptDraft[];
@@ -41,11 +42,18 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
   const [newTitle, setNewTitle] = useState("");
   const [refTitle, setRefTitle] = useState("");
   const [refBody, setRefBody] = useState("");
+  const [brief, setBrief] = useState("");
+  const [briefDirty, setBriefDirty] = useState(false);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/prompts");
-    if (r.ok) setData((await r.json()) as Payload);
-  }, []);
+    if (r.ok) {
+      const j = (await r.json()) as Payload;
+      setData(j);
+      // Never stomp on text being edited right now.
+      setBrief((b) => (briefDirty ? b : j.brief));
+    }
+  }, [briefDirty]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -76,6 +84,25 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
     [act],
   );
 
+  /** Read an image in the browser and post it as a data URL. */
+  const uploadImage = useCallback(
+    async (files: FileList | null) => {
+      for (const f of Array.from(files ?? []).slice(0, 6)) {
+        const dataUrl: string = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = () => res(String(fr.result));
+          fr.onerror = () => rej(fr.error);
+          fr.readAsDataURL(f);
+        });
+        await act("add-reference-image", {
+          title: f.name.replace(/\.[^.]+$/, ""),
+          text: dataUrl,
+        });
+      }
+    },
+    [act],
+  );
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="flex items-center gap-4 border-b border-border px-6 py-4">
@@ -97,11 +124,46 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
 
       <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* ------------------------------------------------------------ inputs */}
-        <Tabs defaultValue="files">
+        <Tabs defaultValue="brief">
           <TabsList>
+            <TabsTrigger value="brief">Brief</TabsTrigger>
             <TabsTrigger value="files">Files</TabsTrigger>
             <TabsTrigger value="refs">Ads I like</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="brief" className="mt-4 space-y-2">
+            <Textarea
+              rows={26}
+              className="font-mono text-xs"
+              value={brief}
+              onChange={(e) => {
+                setBrief(e.target.value);
+                setBriefDirty(true);
+              }}
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                disabled={!briefDirty || busy}
+                onClick={async () => {
+                  setBusy(true);
+                  await fetch("/api/brief", {
+                    method: "PUT",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ brief }),
+                  });
+                  setBriefDirty(false);
+                  setBusy(false);
+                  await load();
+                }}
+              >
+                Save brief
+              </Button>
+              {briefDirty && <Badge variant="secondary">unsaved</Badge>}
+              <span className="text-xs text-muted-foreground">
+                Takes effect on the next generate.
+              </span>
+            </div>
+          </TabsContent>
 
           <TabsContent value="files" className="mt-4 space-y-2">
             {data?.files.map((f) => (
@@ -208,6 +270,14 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
                     checked={r.enabled}
                     onCheckedChange={() => act("toggle-reference", { name: r.id })}
                   />
+                  {r.image && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={`/api/ref/${r.image.file}`}
+                      alt=""
+                      className="size-10 rounded object-cover"
+                    />
+                  )}
                   <span className="flex-1 truncate text-sm">{r.title}</span>
                   <Badge variant="secondary">{r.source}</Badge>
                   <Button
@@ -258,6 +328,21 @@ export default function PromptsScreen({ ads }: { ads: Ad[] }) {
                   </option>
                 ))}
               </select>
+              <Button asChild variant="secondary">
+                <label className="cursor-pointer">
+                  <ImagePlus className="size-4" /> Upload ad image
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      void uploadImage(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </Button>
               <Button variant="secondary" disabled={busy} onClick={() => act("rebuild-from-winners")}>
                 <Sparkles className="size-4" />
                 {busy ? "Writing…" : "Rebuild from winners"}

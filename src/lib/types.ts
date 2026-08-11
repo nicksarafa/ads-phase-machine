@@ -191,7 +191,9 @@ export interface ReferenceAd {
   id: string;
   title: string;
   body: string;
-  source: "pasted" | "captured";
+  source: "pasted" | "captured" | "image";
+  /** An uploaded screenshot of the ad, stored under data/refs. */
+  image?: { file: string; mime: string };
   enabled: boolean;
   createdAt: number;
 }

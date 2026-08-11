@@ -76,7 +76,7 @@ export default function PerfChart({
       <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img">
         {points.map((p, i) => (
           <line
-            key={p.gen}
+            key={`g-${i}`}
             x1={xs(i)}
             y1={PAD.t - 4}
             x2={xs(i)}
@@ -91,7 +91,7 @@ export default function PerfChart({
         <path d={roasPath} fill="none" stroke="#35d39a" strokeWidth="1.8" />
         <path d={ctrPath} fill="none" stroke="#f2994a" strokeWidth="2.2" />
         {points.map((p, i) => (
-          <g key={`l-${p.gen}`}>
+          <g key={`l-${i}`}>
             <circle cx={xs(i)} cy={H - PAD.b + 8} r="0" />
             <text
               x={xs(i)}

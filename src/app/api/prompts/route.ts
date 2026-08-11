@@ -1,6 +1,8 @@
+import fs from "node:fs";
+import path from "node:path";
 import { NextResponse } from "next/server";
 import { pushState } from "@/lib/bus";
-import { getState, log, persist } from "@/lib/store";
+import { REF_DIR, getState, log, persist } from "@/lib/store";
 import {
   createPromptFile,
   deletePromptFile,
@@ -32,6 +34,7 @@ function payload() {
   const input = buildGenerateInput(s);
   const { system, user } = previewPrompt(input);
   return {
+    brief: s.brief,
     files: listPromptFiles().map((f) => ({
       ...f,
       enabled: s.enabledFiles.includes(f.name),
@@ -140,12 +143,52 @@ export async function POST(req: Request) {
       log(`Captured ${ad.label} as a format reference.`, "good");
       return ok();
     }
+    case "add-reference-image": {
+      // The browser sends a data URL; only raster formats the model accepts.
+      const m = /^data:(image\/(png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(
+        String(body.text ?? ""),
+      );
+      if (!m) {
+        return NextResponse.json({ error: "expected a png/jpeg/webp image" }, { status: 400 });
+      }
+      const buf = Buffer.from(m[3], "base64");
+      if (buf.byteLength > 4_000_000) {
+        return NextResponse.json({ error: "image over 4MB" }, { status: 400 });
+      }
+      const id = rid("ref");
+      const ext = m[2] === "jpeg" ? "jpg" : m[2];
+      const file = `${id}.${ext}`;
+      fs.mkdirSync(REF_DIR, { recursive: true });
+      fs.writeFileSync(path.join(REF_DIR, file), new Uint8Array(buf));
+
+      const ref: ReferenceAd = {
+        id,
+        title: String(body.title || "Uploaded ad").slice(0, 80),
+        body: String(body.name || "").slice(0, 2_000),
+        source: "image",
+        image: { file, mime: m[1] },
+        enabled: true,
+        createdAt: Date.now(),
+      };
+      s.references.unshift(ref);
+      log(`Added image reference "${ref.title}".`, "good");
+      return ok();
+    }
     case "toggle-reference": {
       const r = s.references.find((x) => x.id === body.name);
       if (r) r.enabled = !r.enabled;
       return ok();
     }
     case "delete-reference": {
+      const gone = s.references.find((x) => x.id === body.name);
+      if (gone?.image) {
+        // Deleting the row without the file would silently grow data/refs.
+        try {
+          fs.rmSync(path.join(REF_DIR, gone.image.file), { force: true });
+        } catch {
+          /* best effort */
+        }
+      }
       s.references = s.references.filter((x) => x.id !== body.name);
       return ok();
     }

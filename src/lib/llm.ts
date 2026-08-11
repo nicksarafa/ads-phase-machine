@@ -42,7 +42,12 @@ export interface GenerateInput {
   feedbackNotes: { headline: string; rating: number; note: string }[];
   usedHeadlines: string[];
   /** Ads whose shape to imitate — format only, never wording. */
-  references?: { title: string; body: string }[];
+  references?: {
+    title: string;
+    body: string;
+    /** An uploaded screenshot, sent to the model as a real image block. */
+    image?: { base64: string; mime: string };
+  }[];
   /** Bodies of the enabled `prompts/*.md` files, already note-stripped. */
   files?: string[];
 }
@@ -252,6 +257,30 @@ Return only the structured output requested.`;
 
 // ---------------------------------------------------------------- provider 1
 
+/**
+ * The user turn. Reference screenshots ride as image blocks ahead of the text,
+ * each announced by name so the prompt's FORMAT REFERENCES section and the
+ * pictures line up. Without images this is just the prompt string.
+ */
+function userContent(input: GenerateInput) {
+  const imgs = (input.references ?? []).filter((r) => r.image);
+  if (!imgs.length) return buildPrompt(input);
+  return [
+    {
+      type: "text",
+      text: "Reference screenshots of ads whose format works. Match their structure, never their wording or their claims.",
+    },
+    ...imgs.flatMap((r) => [
+      { type: "text", text: `--- ${r.title} ---` },
+      {
+        type: "image",
+        source: { type: "base64", media_type: r.image!.mime, data: r.image!.base64 },
+      },
+    ]),
+    { type: "text", text: buildPrompt(input) },
+  ];
+}
+
 async function viaAnthropic(input: GenerateInput): Promise<GenerateResult> {
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic();
@@ -264,7 +293,7 @@ async function viaAnthropic(input: GenerateInput): Promise<GenerateResult> {
       effort: EFFORT,
       format: { type: "json_schema", schema: AD_SCHEMA as unknown as Record<string, unknown> },
     },
-    messages: [{ role: "user", content: buildPrompt(input) }],
+    messages: [{ role: "user", content: userContent(input) }],
   } as never);
 
   const msg = response as unknown as {

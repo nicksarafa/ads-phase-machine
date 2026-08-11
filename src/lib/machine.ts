@@ -1,5 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
 import { pushState } from "./bus";
-import { getState, log, persist } from "./store";
+import { REF_DIR, getState, log, persist } from "./store";
 import { generateAds, type GenerateResult } from "./llm";
 import {
   clearQueue,
@@ -109,6 +111,20 @@ function allAds(s: AppState): Ad[] {
   return s.adOrder.map((id) => s.ads[id]).filter(Boolean);
 }
 
+/** Load an uploaded reference screenshot for the model, or undefined. */
+function refImage(r: { image?: { file: string; mime: string } }) {
+  if (!r.image) return undefined;
+  try {
+    return {
+      base64: fs.readFileSync(path.join(REF_DIR, r.image.file)).toString("base64"),
+      mime: r.image.mime,
+    };
+  } catch {
+    // A deleted file must not take the generate phase down.
+    return undefined;
+  }
+}
+
 // ------------------------------------------------------------------- phases
 
 async function phaseResearch(token: number) {
@@ -151,7 +167,7 @@ export function buildGenerateInput(s: AppState, insights = s.insights) {
     usedHeadlines: pool.map((a) => a.creative.headline),
     references: s.references
       .filter((r) => r.enabled)
-      .map((r) => ({ title: r.title, body: r.body })),
+      .map((r) => ({ title: r.title, body: r.body, image: refImage(r) })),
     files: extraContextBlocks(s.enabledFiles),
   };
 }

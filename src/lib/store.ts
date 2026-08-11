@@ -11,6 +11,7 @@ import { COMPETITOR_INTEL } from "./hooks";
 const DATA_DIR = path.join(process.cwd(), "data");
 const STATE_FILE = path.join(DATA_DIR, "state.json");
 export const IMAGE_DIR = path.join(DATA_DIR, "images");
+export const REF_DIR = path.join(DATA_DIR, "refs");
 
 const STATE_VERSION = 1;
 
@@ -132,6 +133,7 @@ let writeTimer: NodeJS.Timeout | null = null;
 function ensureDirs() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.mkdirSync(IMAGE_DIR, { recursive: true });
+  fs.mkdirSync(REF_DIR, { recursive: true });
 }
 
 export function loadState(): AppState {
