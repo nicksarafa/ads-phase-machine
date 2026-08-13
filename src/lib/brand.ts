@@ -45,12 +45,19 @@ export const BRAND = {
     "A student's internal portal replaced $800/month in SaaS and paid for the program in the first month",
     "Student builds include booking systems, dashboards, trading bots, and automation workflows",
   ],
+  // Two offers, sold to two different buyers in the same city. Destinations
+  // are not listed here — they are per-campaign and come from the environment,
+  // so a fork of this repo advertises its own site rather than ours.
   offers: {
+    workshops: {
+      label: "Workshops in Lisbon",
+      cta: "Sign Up",
+      note: "An in-person session someone books for themselves. The buyer is the attendee, pays their own way, and decides in one sitting.",
+    },
     "team-training": {
       label: "Team training",
       cta: "Train Your Team",
-      landing: "https://lightschool.com/teams",
-      note: "Custom programs for companies. The only offer this account sells.",
+      note: "Custom programs companies buy for a team that already exists. The buyer owns the budget and the outcome, and is not the learner.",
     },
   },
   voice:

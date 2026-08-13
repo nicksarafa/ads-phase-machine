@@ -72,9 +72,10 @@ export const GENE_SPACE = {
     "workshop-scene",
   ],
   tone: ["warm", "urgent", "analytical", "playful", "authoritative"],
-  // Team training only. The account sells to business owners upgrading a
-  // team; consumer-entry offers pulled the copy toward individuals.
-  offer: ["team-training"],
+  // Two offers, run as two campaigns against the same Lisbon audience so the
+  // offer is the only variable between them. A batch never mixes the two —
+  // the running campaign pins this gene.
+  offer: ["workshops", "team-training"],
 } as const;
 
 export type GeneKey = keyof typeof GENE_SPACE;
@@ -133,6 +134,8 @@ export interface Feedback {
 export interface Ad {
   id: string;
   label: string;
+  /** Which campaign produced this ad. The wall filters on it. */
+  campaign: CampaignId;
   generation: number;
   createdAt: number;
   parentId: string | null;
@@ -283,10 +286,97 @@ export interface PromptDraft {
   createdAt: number;
 }
 
+/**
+ * Where a cycle's ads actually landed in a real Meta account.
+ *
+ * Held on AppState rather than rebuilt per cycle so every cycle attaches its
+ * ads to the *same* campaign and ad set. Creating a fresh $10/day campaign each
+ * time around the loop is how a $10/day experiment quietly becomes $70/day.
+ */
+export interface LivePlacement {
+  accountId: string;
+  campaignId: string;
+  adSetId: string;
+  /** Our ad id -> Meta's ad id. */
+  adIds: Record<string, string>;
+  dailyBudgetCents: number;
+  geoKey: string | null;
+  placedAt: number;
+}
+
+/** One ad's real delivery, as read back from Meta. */
+export interface LiveInsight {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+}
+
+/** What the *running process* knows about its ability to spend real money. */
+export interface LiveStatus {
+  /** ADS_LIVE is set in this process. Without it nothing can be placed. */
+  gateOpen: boolean;
+  /** Gate open, CLI present, and every required variable supplied. */
+  ready: boolean;
+  /** Which variables are still missing, so the UI can name them. */
+  missing: string[];
+  /** Hard per-day ceiling this process will not cross, across all campaigns. */
+  maxDailyUsd: number;
+  /** Problems found reading the last placement back from Meta. */
+  lastVerify: string[] | null;
+  /**
+   * Where each campaign's clicks go, resolved from the environment.
+   *
+   * Surfaced here rather than stored on the Campaign so the destination is
+   * never persisted into `data/state.json` — it stays a fact about the
+   * operator's own environment, which is what keeps it out of the repo.
+   */
+  destinations: Record<string, string>;
+  /** Human summary of the targeting, e.g. "Lisbon 40km · PT". */
+  geoLabel: string;
+}
+
+/** The two things this account sells. Each runs as its own Meta campaign. */
+export const CAMPAIGN_IDS = ["workshops", "team-training"] as const;
+export type CampaignId = (typeof CAMPAIGN_IDS)[number];
+
+/**
+ * One offer, run as one Meta campaign.
+ *
+ * Both campaigns target the same Lisbon audience, so the offer is the only
+ * variable between them and the comparison is honest. Everything that differs
+ * between the two — who the ad talks to, where it sends them, what it costs —
+ * lives here rather than in global settings.
+ */
+export interface Campaign {
+  id: CampaignId;
+  /** Shown on the switcher. */
+  name: string;
+  /** One line under the name, explaining who it is for. */
+  audience: string;
+  /** The operator brief the copywriter works from for this offer. */
+  brief: string;
+  /** Dollars per day for this campaign alone. The cap governs the sum. */
+  dailyBudget: number;
+  /** The real Meta campaign, once live mode has placed anything. */
+  placement: LivePlacement | null;
+}
+
 export interface Settings {
+  /**
+   * Place ads on the real Meta account instead of simulating delivery.
+   *
+   * Only honoured when the ADS_LIVE gate is open in the environment, so a
+   * clone of this repo cannot spend money by flipping a switch in the UI.
+   */
+  live: boolean;
   /** Ads produced per cycle. */
   adsPerCycle: number;
-  /** Total daily budget in dollars, split across active ads. */
+  /**
+   * Legacy single-campaign budget, kept only so old state files load. The
+   * number that governs spend is Campaign.dailyBudget, summed against the cap.
+   */
   dailyBudget: number;
   /** Real seconds that represent one 6-hour observation window. */
   secondsPerWindow: number;
@@ -296,12 +386,20 @@ export interface Settings {
   speed: number;
   /** How images get made. */
   imageMode: "ai" | "procedural";
+  /**
+   * How many of a cycle's ads get a real AI image. Every image costs money, so
+   * the rest keep their procedural artwork. Only applies when imageMode is "ai".
+   */
+  aiImagesPerCycle: number;
   /** Pause the loop after each cycle instead of rolling straight on. */
   stepMode: boolean;
   /** Kill ads whose score falls below this percentile of the cycle. */
   killThreshold: number;
-  /** Pin the campaign to one offer, or let the machine pick per ad. */
-  offerFocus: "team-training";
+  /**
+   * Which campaign the wall is showing and the machine will run next.
+   * Also pins the `offer` gene, so a batch never mixes the two offers.
+   */
+  offerFocus: CampaignId;
   /** Ask the image model to place the Light School mark in the creative. */
   brandLogo: boolean;
 }
@@ -335,6 +433,8 @@ export interface MachineState {
     openai: boolean;
     claudeCli: boolean;
   };
+  /** What this process can and cannot do with real money. */
+  live: LiveStatus;
   lastError: string | null;
 }
 
@@ -342,7 +442,8 @@ export interface AppState {
   version: number;
   machine: MachineState;
   settings: Settings;
-  brief: string;
+  /** The two offers, each with its own brief, budget and Meta campaign. */
+  campaigns: Campaign[];
   context: ContextSource[];
   /** Ads whose format the copy model should imitate. */
   references: ReferenceAd[];
@@ -359,6 +460,11 @@ export interface AppState {
   adOrder: string[];
   insights: GeneInsight[];
   log: LogEntry[];
+}
+
+/** The campaign the wall is showing and the machine will run next. */
+export function activeCampaign(s: AppState): Campaign {
+  return s.campaigns.find((c) => c.id === s.settings.offerFocus) ?? s.campaigns[0];
 }
 
 export const EMPTY_METRICS: Metrics = {

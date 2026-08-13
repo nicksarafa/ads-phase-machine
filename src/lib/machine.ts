@@ -12,6 +12,16 @@ import {
   writeProcedural,
 } from "./imagegen";
 import { simulateWindow } from "./simulator";
+import {
+  fetchInsights,
+  landingUrlFor,
+  launchLive,
+  liveGateOpen,
+  maxDailyUsd,
+  pollIntervalMs,
+  preflight,
+  verifyPlacement,
+} from "./meta";
 import { extraContextBlocks, mainPrompt, sectionOr } from "./library";
 import { brandBlock } from "./brand";
 import { hookBriefBlock } from "./hooks";
@@ -19,10 +29,12 @@ import { computeInsights, exploitPlan, learningsFrom, scoreAd } from "./insights
 import {
   EMPTY_METRICS,
   PHASES,
+  activeCampaign,
   deriveMetrics,
   type Ad,
   type AppState,
   type Generation,
+  type LiveInsight,
   type Phase,
 } from "./types";
 
@@ -105,12 +117,50 @@ function nextAdId() {
   return `ad-${Date.now().toString(36)}-${(adSeq++).toString(36)}`;
 }
 
+/**
+ * Both pools are scoped to the campaign being run.
+ *
+ * The two campaigns are separate experiments that happen to share an audience.
+ * Pooling them would let a winning workshops hook steer team-training copy —
+ * and since the offer gene is pinned per campaign, the insight engine would be
+ * comparing ads that never competed for the same impression.
+ */
 function activeAds(s: AppState): Ad[] {
-  return s.adOrder.map((id) => s.ads[id]).filter((a) => a && a.status === "active");
+  return allAds(s).filter((a) => a.status === "active");
 }
 
 function allAds(s: AppState): Ad[] {
-  return s.adOrder.map((id) => s.ads[id]).filter(Boolean);
+  const focus = s.settings.offerFocus;
+  return s.adOrder.map((id) => s.ads[id]).filter((a) => a && a.campaign === focus);
+}
+
+/**
+ * Whether this cycle places real ads.
+ *
+ * Both conditions are required and the environment is the senior one: the UI
+ * toggle can only ever narrow what the operator's own .env has already allowed.
+ * Someone who clones this repo and clicks every button still cannot spend.
+ */
+function liveMode(s: AppState): boolean {
+  return s.settings.live && liveGateOpen();
+}
+
+/** Re-read what this process can do with real money, for the UI to display. */
+export async function refreshLiveStatus() {
+  const s = getState();
+  const p = await preflight();
+  const destinations: Record<string, string> = {};
+  for (const c of s.campaigns) destinations[c.id] = landingUrlFor(c.id);
+  s.machine.live = {
+    gateOpen: p.gateOpen,
+    ready: p.ready,
+    missing: p.missing,
+    maxDailyUsd: p.maxDailyUsd,
+    lastVerify: s.machine.live?.lastVerify ?? null,
+    destinations,
+    geoLabel: `${p.config.city} ${p.config.radiusKm}km · ${p.config.countryCode}`,
+  };
+  return s.machine.live;
 }
 
 /** Load an uploaded reference screenshot for the model, or undefined. */
@@ -149,7 +199,7 @@ export function buildGenerateInput(s: AppState, insights = s.insights) {
   return {
     count: s.settings.adsPerCycle,
     cycle: s.machine.cycle,
-    brief: mainPrompt(s.brief),
+    brief: mainPrompt(s.settings.offerFocus, activeCampaign(s).brief),
     offerFocus: s.settings.offerFocus,
     context: s.context,
     insights,
@@ -301,7 +351,7 @@ async function phaseGenerate(token: number): Promise<Generation | null> {
   const generation: Generation = {
     index: s.machine.cycle,
     createdAt: Date.now(),
-    brief: s.brief,
+    brief: activeCampaign(s).brief,
     adIds: [],
     learnings: input.learnings,
     exploitGenes: input.exploit,
@@ -311,13 +361,15 @@ async function phaseGenerate(token: number): Promise<Generation | null> {
   const cycleStamp = s.machine.cycle;
   const focus = s.settings.offerFocus;
   result.ads.forEach((draft, i) => {
-    // The account sells one offer, so this is a hard constraint rather than a
-    // suggestion — the model does not get to wander back to a consumer offer.
+    // A batch belongs to exactly one campaign, so the offer is pinned rather
+    // than suggested. Both campaigns run against the same Lisbon audience —
+    // if the model wandered between offers the comparison would mean nothing.
     draft.genes = { ...draft.genes, offer: focus };
     const id = nextAdId();
     const ad: Ad = {
       id,
       label: `G${cycleStamp + 1}·${String(i + 1).padStart(2, "0")}`,
+      campaign: focus,
       generation: cycleStamp,
       createdAt: Date.now(),
       parentId: input.winners[0]?.id ?? null,
@@ -369,7 +421,15 @@ async function phaseRender(generation: Generation, token: number) {
   if (!s.settings.stepMode) beginPrefetch();
 
   const provider = await resolveProvider();
+  const aiMode = s.settings.imageMode === "ai" && provider !== "procedural";
   s.machine.imageProvider = s.settings.imageMode === "ai" ? provider : "procedural";
+
+  // Every AI image costs money, so only the first N ads of the cycle get one.
+  // The rest keep the procedural artwork they are about to be given.
+  const aiIds = aiMode
+    ? generation.adIds.slice(0, Math.max(0, s.settings.aiImagesPerCycle))
+    : [];
+  const wantsAi = new Set(aiIds);
 
   for (const id of generation.adIds) {
     const ad = s.ads[id];
@@ -377,7 +437,7 @@ async function phaseRender(generation: Generation, token: number) {
     // Procedural artwork lands instantly so the wall is never empty.
     writeProcedural(ad.id, ad.genes, ad.creative.headline);
     ad.image = {
-      status: s.settings.imageMode === "ai" ? "rendering" : "ready",
+      status: wantsAi.has(id) ? "rendering" : "ready",
       url: `/api/image/${ad.id}?v=${Date.now()}`,
       provider: "procedural",
       error: null,
@@ -386,13 +446,13 @@ async function phaseRender(generation: Generation, token: number) {
   }
   flush(true);
 
-  if (s.settings.imageMode === "ai" && provider !== "procedural") {
+  if (aiIds.length) {
     log(
-      `Queued ${generation.adIds.length} image renders on ${provider}. Cards update as each lands.`,
+      `Queued ${aiIds.length} of ${generation.adIds.length} image renders on ${provider} — the rest keep procedural artwork. Cards update as each lands.`,
       "info",
       "render",
     );
-    for (const id of generation.adIds) {
+    for (const id of aiIds) {
       const ad = s.ads[id];
       if (!ad) continue;
       enqueue(async () => {
@@ -439,6 +499,100 @@ async function phaseRender(generation: Generation, token: number) {
   await phaseWait(speedMs(700), token);
 }
 
+/**
+ * Place this cycle's ads on the real Meta account.
+ *
+ * The ads land PAUSED, so this function spends nothing on its own — it stages
+ * work for a human to approve. What it must get right is the budget and the
+ * campaign identity, and both are checked against Meta's own records before the
+ * cycle is allowed to continue.
+ */
+async function launchOnMeta(generation: Generation) {
+  const s = getState();
+  const ads = generation.adIds.map((id) => s.ads[id]).filter(Boolean);
+  if (!ads.length) return;
+
+  const campaign = activeCampaign(s);
+
+  // The cap is a ceiling on the TOTAL across campaigns, so what this campaign
+  // may spend is whatever the others have not already committed.
+  const cap = maxDailyUsd();
+  const others = s.campaigns
+    .filter((c) => c.id !== campaign.id)
+    .reduce((sum, c) => sum + c.dailyBudget, 0);
+  const budget = Math.min(campaign.dailyBudget, Math.max(0, cap - others));
+  if (budget < campaign.dailyBudget) {
+    log(
+      `${campaign.name} asks for $${campaign.dailyBudget}/day but $${others}/day is committed to other campaigns against a $${cap} cap — placing at $${budget}.`,
+      "warn",
+      "launch",
+    );
+  }
+
+  const reusing = campaign.placement;
+  log(
+    reusing
+      ? `Attaching ${ads.length} ads to the existing campaign, paused, at the unchanged $${budget}/day.`
+      : `Creating a paused campaign at $${budget}/day and placing ${ads.length} ads. Nothing spends until you activate it.`,
+    "info",
+    "launch",
+  );
+  flush(true);
+
+  const placement = await launchLive(ads, {
+    campaignId: campaign.id,
+    campaignName: campaign.name,
+    dailyBudgetUsd: budget,
+    otherBudgetsUsd: others,
+    existing: reusing,
+  });
+
+  campaign.placement = placement;
+  for (const ad of ads) {
+    const metaId = placement.adIds[ad.id];
+    if (!metaId) continue;
+    ad.platform = {
+      campaignId: placement.campaignId,
+      adSetId: placement.adSetId,
+      adId: metaId,
+    };
+  }
+
+  const placed = Object.keys(placement.adIds).length;
+  if (placed < ads.length) {
+    log(
+      `Only ${placed} of ${ads.length} ads came back with a Meta id — the rest are not live and will not be measured.`,
+      "warn",
+      "launch",
+    );
+  }
+  log(
+    `Placed ${placed} ad(s) on Meta campaign ${placement.campaignId}, all PAUSED.`,
+    "good",
+    "launch",
+  );
+  flush(true);
+
+  // The model made the calls; it does not get to grade its own work. Budget,
+  // pause state and country come from Meta.
+  const check = await verifyPlacement(placement);
+  s.machine.live.lastVerify = check.ok ? [] : check.problems;
+  if (check.ok) {
+    log(
+      `Verified against Meta: $${(check.observed.campaignDailyBudgetCents ?? 0) / 100}/day, campaign ${check.observed.campaignStatus}, ${check.observed.countryCodes.join(", ") || "no"} targeting, 0 active ads.`,
+      "good",
+      "launch",
+    );
+  } else {
+    // Loud, and the loop stops. A placement that does not match the plan is the
+    // one situation where continuing could cost money nobody authorised.
+    for (const p of check.problems) log(`Placement mismatch: ${p}`, "warn", "launch");
+    throw new Error(
+      `Meta placement did not match the plan (${check.problems.join("; ")}). Machine halted — check the campaign by hand.`,
+    );
+  }
+}
+
 async function phaseLaunch(generation: Generation, token: number) {
   setPhase("launch");
   const s = getState();
@@ -449,19 +603,127 @@ async function phaseLaunch(generation: Generation, token: number) {
     ad.status = "active";
   }
 
+  if (liveMode(s)) {
+    await launchOnMeta(generation);
+    if (token !== rt.token) return;
+    rebalanceBudget(s);
+    await phaseWait(speedMs(700), token);
+    return;
+  }
+
   rebalanceBudget(s);
 
   log(
-    `Placed ${generation.adIds.length} ads into ${new Set(generation.adIds.map((id) => s.ads[id]?.platform.adSetId)).size} ad set(s). Daily budget $${s.settings.dailyBudget} across ${activeAds(s).length} live ads.`,
+    `Placed ${generation.adIds.length} ads for ${activeCampaign(s).name} into ${new Set(generation.adIds.map((id) => s.ads[id]?.platform.adSetId)).size} ad set(s). Daily budget $${activeCampaign(s).dailyBudget} across ${activeAds(s).length} live ads.`,
     "good",
     "launch",
   );
   await phaseWait(speedMs(700), token);
 }
 
+/**
+ * Read real delivery back from Meta on a real clock.
+ *
+ * The simulated observe phase compresses six hours into six seconds. Nothing
+ * about that survives contact with a real ad account, so live mode polls at
+ * wall-clock intervals and reports exactly what Meta says — including, most of
+ * the time at first, that nothing has happened yet because the ads are still
+ * paused awaiting review. Reporting zeros honestly is the whole point; the
+ * failure mode to avoid is a dashboard that looks busy while nothing is live.
+ */
+async function observeLive(token: number) {
+  const s = getState();
+  const placement = activeCampaign(s).placement;
+  if (!placement) {
+    log("Live mode is on but nothing has been placed yet — skipping delivery.", "warn", "observe");
+    return;
+  }
+
+  const windows = Math.max(1, s.settings.windowsPerCycle);
+  const pollMs = pollIntervalMs();
+  log(
+    `Reading Meta every ${Math.round(pollMs / 60_000)} min, ${windows} time(s) this cycle.`,
+    "info",
+    "observe",
+  );
+  flush(true);
+
+  for (let w = 0; w < windows; w++) {
+    if (token !== rt.token) return;
+
+    await sleep(pollMs);
+    if (token !== rt.token) return;
+
+    let insights: Record<string, LiveInsight>;
+    try {
+      insights = await fetchInsights(placement);
+    } catch (e) {
+      // A failed read is a bad minute, not a bad run. The next poll retries.
+      log(`Could not read insights: ${msgOf(e)}`, "warn", "observe");
+      continue;
+    }
+    if (token !== rt.token) return;
+
+    let anyDelivery = false;
+    for (const [adId, m] of Object.entries(insights)) {
+      const ad = s.ads[adId];
+      if (!ad) continue;
+      // Meta reports lifetime totals, so these are assignments. Adding them
+      // would compound the same spend on every poll and invent a budget
+      // overrun that never happened.
+      ad.metrics = deriveMetrics({
+        spend: m.spend,
+        impressions: m.impressions,
+        clicks: m.clicks,
+        conversions: m.conversions,
+        revenue: m.revenue,
+      });
+      if (m.impressions > 0) anyDelivery = true;
+      ad.history.push({
+        ...ad.metrics,
+        atHour: Math.round((Date.now() - placement.placedAt) / 3_600_000),
+        cycle: s.machine.cycle,
+      });
+      if (ad.history.length > 80) ad.history.shift();
+    }
+
+    const totals = Object.values(insights).reduce(
+      (a, m) => ({
+        spend: a.spend + m.spend,
+        clicks: a.clicks + m.clicks,
+        impressions: a.impressions + m.impressions,
+      }),
+      { spend: 0, clicks: 0, impressions: 0 },
+    );
+
+    if (anyDelivery) {
+      log(
+        `Meta reports $${totals.spend.toFixed(2)} spent · ${totals.impressions} impressions · ${totals.clicks} clicks across ${Object.keys(insights).length} ads.`,
+        "info",
+        "observe",
+      );
+    } else {
+      log(
+        "No delivery yet — the ads are still paused on Meta. Activate the campaign to start spending.",
+        "warn",
+        "observe",
+      );
+    }
+
+    s.machine.phaseProgress = (w + 1) / windows;
+    flush(true);
+  }
+}
+
 async function phaseObserve(token: number) {
   setPhase("observe");
   const s = getState();
+
+  if (liveMode(s)) {
+    await observeLive(token);
+    return;
+  }
+
   const windows = s.settings.windowsPerCycle;
 
   // Delivery is the one phase that always has something to show, so it is also
@@ -500,7 +762,7 @@ async function phaseObserve(token: number) {
 
     const results = live.map((ad) => {
       const share = ad.dailyBudget / totalWeight;
-      const windowBudget = (s.settings.dailyBudget / 4) * share;
+      const windowBudget = (activeCampaign(s).dailyBudget / 4) * share;
       return {
         ad,
         result: simulateWindow(ad, windowBudget, Math.round(s.machine.clockHours / 6) + w),
@@ -645,7 +907,7 @@ function rebalanceBudget(s: AppState) {
   const total = weights.reduce((a, b) => a + b, 0);
   live.forEach((ad, i) => {
     ad.dailyBudget =
-      Math.round(((weights[i] / total) * s.settings.dailyBudget) * 100) / 100;
+      Math.round(((weights[i] / total) * activeCampaign(s).dailyBudget) * 100) / 100;
   });
 }
 
@@ -706,9 +968,28 @@ async function loop(token: number) {
 
 // ------------------------------------------------------------------ control
 
-export function startMachine(step = false) {
+export async function startMachine(step = false) {
   const s = getState();
   if (s.machine.running) return;
+
+  // Fail before the expensive part. Generating copy and rendering images costs
+  // real money too, so a live run that could never place its ads should stop
+  // here rather than after a full cycle of billable work.
+  const live = await refreshLiveStatus();
+  if (s.settings.live) {
+    if (!live.gateOpen) {
+      log("Live mode is selected but ADS_LIVE is not set in this process — refusing to start.", "warn", "idle");
+      flush(true);
+      return;
+    }
+    if (!live.ready) {
+      log(`Live mode is not configured: missing ${live.missing.join(", ")}. Refusing to start.`, "warn", "idle");
+      flush(true);
+      return;
+    }
+    log(`Live mode: ads will be placed PAUSED on Meta, capped at $${live.maxDailyUsd}/day.`, "warn", "idle");
+  }
+
   s.settings.stepMode = step;
   s.machine.running = true;
   s.machine.lastError = null;

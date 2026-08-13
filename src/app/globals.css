@@ -450,6 +450,141 @@ select {
   color: var(--ink-faint);
   line-height: 1.45;
 }
+.hint.warn {
+  color: var(--warn);
+}
+
+/* Live mode changes what every button on the page does, so it is stated in
+   the masthead rather than only in the settings panel. */
+.sub-live {
+  color: var(--bad);
+  font-weight: 650;
+}
+
+/* ------------------------------------------------------ campaign switcher */
+/* The two offers are the top-level thing this tool manages, so they sit above
+   everything else and carry the facts you need before spending: where the
+   clicks land, what it costs a day, and whether anything is on Meta yet. */
+.campaignbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+.campaign-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.campaign-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-inset);
+  color: var(--ink-faint);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.12s, color 0.12s;
+}
+.campaign-tab:hover:not(:disabled) {
+  border-color: #2b323d;
+}
+.campaign-tab strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.campaign-tab span {
+  font-size: 11px;
+  line-height: 1.3;
+}
+.campaign-tab.on {
+  border-color: var(--accent);
+  background: var(--bg-panel);
+}
+.campaign-tab.on strong {
+  color: var(--accent);
+}
+.campaign-tab:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.campaign-meta {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 12px;
+}
+.campaign-dest {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.campaign-dest .lbl {
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.campaign-dest a {
+  color: var(--info);
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+.campaign-dest a:hover {
+  text-decoration: underline;
+}
+.campaign-dest .missing {
+  color: var(--warn);
+  font-size: 11.5px;
+}
+.campaign-dest .ok {
+  color: var(--good);
+  font-size: 11.5px;
+}
+.campaign-dest input[type="number"] {
+  width: 68px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------- live mode */
+/* The one control on this page that spends real money. It reads as inert
+   config until it is armed, then it is unmistakable. */
+.live-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-inset);
+}
+.live-box.armed {
+  border-color: var(--bad);
+  background: rgba(255, 93, 115, 0.06);
+}
+.live-box.armed .btn.on {
+  border-color: var(--bad);
+  color: var(--bad);
+  font-weight: 650;
+}
+.live-cap {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--bad);
+  align-self: center;
+}
 
 textarea,
 input[type="text"],

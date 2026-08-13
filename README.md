@@ -180,16 +180,72 @@ URLs get fetched and read. Everything enabled feeds the research phase.
 
 ## Facebook Ads
 
-This build **simulates** the ad platform. Nothing is posted, no budget is spent,
-and no account is touched.
+**By default this build simulates the ad platform.** Nothing is posted, no
+budget is spent, and no account is touched. Clone it, run it, and it cannot
+reach Meta.
 
 The seam is deliberately narrow. `src/lib/simulator.ts` exposes one function,
 `simulateWindow(ad, budget, windowIndex)`, and `src/lib/machine.ts` calls it in
 exactly one place (`phaseObserve`) alongside two other platform touchpoints —
-`phaseLaunch` (create) and `rebalanceBudget` (allocate). Swapping in the real
-Facebook Ads MCP means implementing those three operations against it and
-reading real insights instead of a simulated window. Everything else — the
-phases, the scoring, the evolution, the UI — is unchanged.
+`phaseLaunch` (create) and `rebalanceBudget` (allocate).
+
+### Live mode
+
+`src/lib/meta.ts` implements those touchpoints against a real Meta ad account.
+It is off unless you deliberately turn it on, and it is built so that the model
+never decides anything that costs money:
+
+1. This process computes the exact plan — budget in cents, geo, objective,
+   statuses — and asserts it against a hard cap **before** anything is called.
+2. The `claude` CLI executes that plan against the connected `facebook-ads`
+   MCP. There is no Meta token to store: it reuses the authorisation already in
+   your Claude Code credential store.
+3. The placement is **read back from Meta** and checked against the plan. A
+   mismatch in budget, pause state, or country halts the machine rather than
+   letting an unverified campaign run.
+
+Ads are always created `PAUSED`. Nothing spends until you activate the campaign
+by hand in Meta Ads Manager.
+
+The budget lives on the **campaign** (CBO), not the ad set. That is the stronger
+cap: one number governs every ad set beneath it, so no later cycle can add a
+second ad set and quietly double the daily spend.
+
+Turning it on takes three gates, all of which must agree:
+
+| Gate | Where | Why |
+| --- | --- | --- |
+| `ADS_LIVE=1` | your local `.env` | The environment is senior. Without it the UI toggle does not even appear. |
+| `ADS_LIVE_MAX_DAILY_USD` | your local `.env` | A ceiling this process refuses to cross, whatever the UI or saved state asks for. |
+| The dashboard toggle | the UI | A deliberate, visible act. Arming it clamps the budget field to the cap. |
+
+Connect the MCP once:
+
+```bash
+claude mcp add --transport http facebook-ads https://mcp.facebook.com/ads
+```
+
+Then fill in `ADS_META_AD_ACCOUNT_ID`, `ADS_META_PAGE_ID`, `ADS_LANDING_URL` and
+the `ADS_GEO_*` targeting in `.env`. See `.env.example` for the full list.
+
+### Keeping a public repo safe
+
+This repo is open source but drives a real ad account, so two different things
+have to stay out of it: credential-shaped strings, and *your own identifiers* —
+ad account id, Page id, landing URL. The second kind is what actually leaks,
+because nobody thinks twice about pasting an account id into a README.
+
+Every private value is read from the environment; none is hardcoded in source.
+`.gitignore` excludes `.env`, `data/state.json` (which holds real campaign ids
+and spend once live mode runs), and `public/generated` (real ad creative).
+
+A commit guard backs that up. It reads the values out of *your* `.env` and
+blocks a commit that contains any of them, so it protects your specific private
+values without this repo ever having to contain them:
+
+```bash
+bash scripts/check-secrets.sh --install   # installs a pre-commit hook
+```
 
 ---
 
@@ -208,6 +264,21 @@ All optional. See `.env.example`.
 | `GEMINI_IMAGE_MODEL` | Default `gemini-3-pro-image`. Set `gemini-3.1-flash-image` for faster, cheaper renders. |
 | `OPENAI_API_KEY` | Enables the OpenAI images path. |
 | `ADS_IMAGE_CONCURRENCY` | Parallel AI image renders. Default 2. |
+
+**Live placement.** All empty by default; the machine simulates and cannot
+spend. See [Live mode](#live-mode) before setting any of these.
+
+| Variable | Purpose |
+|---|---|
+| `ADS_LIVE` | Master switch. Unset means no ad can reach Meta, whatever the UI says. |
+| `ADS_LIVE_MAX_DAILY_USD` | Hard daily ceiling this process refuses to cross. Default 10. |
+| `ADS_META_AD_ACCOUNT_ID` | Ad account id, digits only, no `act_` prefix. |
+| `ADS_META_PAGE_ID` | The Page the ads post as. Must be promoted under that account. |
+| `ADS_LANDING_URL` | Where clicks go. Required — placement refuses without it. |
+| `ADS_GEO_CITY` / `ADS_GEO_COUNTRY` | Label and country code. Default `Lisbon` / `PT`. |
+| `ADS_GEO_LAT` / `ADS_GEO_LNG` / `ADS_GEO_RADIUS_KM` | Custom-location pin. Default Lisbon centre, 40km. |
+| `ADS_LIVE_POLL_MINUTES` | Minutes between reads of Meta. Default 30. Each read is a billable model call. |
+| `ADS_LIVE_TIMEOUT_MS` | Ceiling on one Meta step. Default 300000. |
 
 **Image providers**, tried in that order. `google` is Nano Banana Pro on the
 Gemini API — it returns the image inline as base64, so there's no second fetch.

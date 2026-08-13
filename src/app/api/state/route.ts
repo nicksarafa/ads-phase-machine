@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getState } from "@/lib/store";
 import { hasBinary } from "@/lib/llm";
+import { refreshLiveStatus } from "@/lib/machine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,5 +17,8 @@ export async function GET() {
     openai: Boolean(process.env.OPENAI_API_KEY),
     claudeCli: await hasBinary("claude"),
   };
+  // Same reasoning for the money gate: the UI must show whether *this* process
+  // can place an ad, never what a stale state file once recorded.
+  await refreshLiveStatus();
   return NextResponse.json(s);
 }
