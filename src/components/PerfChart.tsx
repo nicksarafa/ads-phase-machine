@@ -81,15 +81,15 @@ export default function PerfChart({
             y1={PAD.t - 4}
             x2={xs(i)}
             y2={H - PAD.b}
-            stroke="#171b22"
+            stroke="var(--line)"
             strokeWidth="1"
           />
         ))}
         {cpaPath && (
-          <path d={cpaPath} fill="none" stroke="#5aa9ff" strokeWidth="1.8" />
+          <path d={cpaPath} fill="none" stroke="var(--series-cpa)" strokeWidth="2" />
         )}
-        <path d={roasPath} fill="none" stroke="#35d39a" strokeWidth="1.8" />
-        <path d={ctrPath} fill="none" stroke="#f2994a" strokeWidth="2.2" />
+        <path d={roasPath} fill="none" stroke="var(--series-roas)" strokeWidth="2" />
+        <path d={ctrPath} fill="none" stroke="var(--series-ctr)" strokeWidth="2.4" />
         {points.map((p, i) => (
           <g key={`l-${i}`}>
             <circle cx={xs(i)} cy={H - PAD.b + 8} r="0" />
@@ -98,7 +98,7 @@ export default function PerfChart({
               y={H - 5}
               textAnchor="middle"
               fontSize="9"
-              fill="#5f6b7a"
+              fill="var(--ink-faint)"
               fontFamily="ui-monospace, monospace"
             >
               G{p.gen}
@@ -109,22 +109,22 @@ export default function PerfChart({
 
       <div className="legend" style={{ marginTop: 6 }}>
         <span>
-          <i style={{ background: "#f2994a" }} />
+          <i style={{ background: "var(--series-ctr)" }} />
           CTR
         </span>
         <span>
-          <i style={{ background: "#5aa9ff" }} />
+          <i style={{ background: "var(--series-cpa)" }} />
           CPA (inverted — up is cheaper)
         </span>
         <span>
-          <i style={{ background: "#35d39a" }} />
+          <i style={{ background: "var(--series-roas)" }} />
           ROAS
         </span>
       </div>
 
       <div className="hint" style={{ marginTop: 8 }}>
         CTR from generation 1 to {last.gen}:{" "}
-        <strong style={{ color: ctrDelta >= 0 ? "#35d39a" : "#ff5d73" }}>
+        <strong style={{ color: ctrDelta >= 0 ? "var(--good)" : "var(--bad)" }}>
           {ctrDelta >= 0 ? "+" : ""}
           {ctrDelta.toFixed(0)}%
         </strong>

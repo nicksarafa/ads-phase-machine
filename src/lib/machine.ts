@@ -578,8 +578,22 @@ async function launchOnMeta(generation: Generation) {
   const check = await verifyPlacement(placement);
   s.machine.live.lastVerify = check.ok ? [] : check.problems;
   if (check.ok) {
+    // Every value here is what Meta actually returned. Anything Meta did not
+    // report is printed as "unconfirmed" rather than as a reassuring number —
+    // a verification line that states more than it checked is worse than no
+    // line at all, because it is the thing the operator trusts before
+    // activating a campaign that spends their money.
+    const o = check.observed;
+    const budget =
+      o.campaignDailyBudgetCents === null
+        ? "budget unconfirmed"
+        : `$${o.campaignDailyBudgetCents / 100}/day`;
+    const activeAds =
+      o.activeAdCount === null
+        ? "active ad count unconfirmed"
+        : `${o.activeAdCount} active ads`;
     log(
-      `Verified against Meta: $${(check.observed.campaignDailyBudgetCents ?? 0) / 100}/day, campaign ${check.observed.campaignStatus}, ${check.observed.countryCodes.join(", ") || "no"} targeting, 0 active ads.`,
+      `Verified against Meta: ${budget}, campaign ${o.campaignStatus ?? "status unconfirmed"}, ad set ${o.adSetStatus ?? "status unconfirmed"}, ${o.countryCodes.join(", ") || "no"} targeting, ${activeAds}.`,
       "good",
       "launch",
     );
