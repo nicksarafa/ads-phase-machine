@@ -135,8 +135,20 @@ export const SECTION_FILES = ["design.md", "brand-block.md", "hook-patterns.md"]
  */
 export const MAIN_FILE = "main.md";
 
-export function mainPrompt(fallback: string): string {
-  const f = readPromptFile(MAIN_FILE);
+/**
+ * The operator brief for one campaign.
+ *
+ * Each campaign owns its own prompt file, because the two offers are sold to
+ * opposite buyers and a single shared file would silently make both campaigns
+ * generate the same ads. `main.md` remains the team-training file so edits made
+ * before campaigns existed are not orphaned.
+ */
+export function mainPromptFileFor(campaignId: string): string {
+  return campaignId === "team-training" ? MAIN_FILE : `${campaignId}.md`;
+}
+
+export function mainPrompt(campaignId: string, fallback: string): string {
+  const f = readPromptFile(mainPromptFileFor(campaignId));
   return f?.body ? f.body : fallback;
 }
 

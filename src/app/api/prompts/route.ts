@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { pushState } from "@/lib/bus";
+import { activeCampaign } from "@/lib/types";
 import { REF_DIR, getState, log, persist } from "@/lib/store";
 import {
   MAIN_FILE,
@@ -37,7 +38,7 @@ function payload() {
   const input = buildGenerateInput(s);
   const { system, user } = previewPrompt(input);
   return {
-    brief: mainPrompt(s.brief),
+    brief: mainPrompt(s.settings.offerFocus, activeCampaign(s).brief),
     context: s.context,
     files: listPromptFiles()
       .filter((f) => f.name !== MAIN_FILE)
@@ -320,8 +321,8 @@ export async function POST(req: Request) {
     case "use-draft": {
       const d = s.drafts.find((x) => x.id === body.name);
       if (!d) return NextResponse.json({ error: "unknown draft" }, { status: 400 });
-      s.brief = d.body;
-      log(`Operator brief replaced with "${d.title}". Takes effect next generate.`, "good");
+      activeCampaign(s).brief = d.body;
+      log(`Brief for ${activeCampaign(s).name} replaced with "${d.title}". Takes effect next generate.`, "good");
       return ok();
     }
     case "delete-draft": {

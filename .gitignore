@@ -13,10 +13,21 @@ out
 .dev.vars
 
 # Generated at runtime
+# state.json is the important one once live mode is on: it holds real Meta
+# campaign, ad set and ad ids, plus real spend, for the operator's account.
 data/state.json
 data/images
 # Uploaded reference ads and design assets — a clone starts empty.
 data/refs
+# Working image prompts and any other scratch dropped in the runtime dir.
+data/*.txt
+
+# Generated ad creative. Real campaign artwork for a real account — it is the
+# operator's, not the project's, and a clone starts with an empty wall.
+public/generated
+
+# Local Claude Code state: machine-specific paths and tool permissions.
+.claude/settings.local.json
 
 *.tsbuildinfo
 next-env.d.ts

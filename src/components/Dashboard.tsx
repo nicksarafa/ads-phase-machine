@@ -58,8 +58,20 @@ export default function Dashboard({ initial }: { initial: AppState }) {
 
 
   // --------------------------------------------------------------- derived
+  const campaign = useMemo(
+    () =>
+      state.campaigns?.find((c) => c.id === state.settings.offerFocus) ??
+      state.campaigns?.[0],
+    [state],
+  );
+
+  // The wall shows one campaign at a time. Mixing them would put two different
+  // offers, sold to two different buyers, into a single set of averages.
   const ads = useMemo(
-    () => state.adOrder.map((id) => state.ads[id]).filter(Boolean),
+    () =>
+      state.adOrder
+        .map((id) => state.ads[id])
+        .filter((a) => a && a.campaign === state.settings.offerFocus),
     [state],
   );
 
@@ -82,6 +94,16 @@ export default function Dashboard({ initial }: { initial: AppState }) {
       cpa: t.conversions ? t.spend / t.conversions : 0,
       roas: t.spend ? t.revenue / t.spend : 0,
       live: ads.filter((a) => a.status === "active").length,
+      /**
+       * Whether revenue is measurable at all.
+       *
+       * The connected account has no pixel, so conversions and revenue come
+       * back as zero from Meta forever. Rendering that as "0.00x ROAS" would
+       * read as a catastrophic result rather than an absent one, so a missing
+       * signal is shown as missing.
+       */
+      tracked: t.spend > 0 && t.conversions > 0,
+      delivering: t.impressions > 0,
     };
   }, [ads]);
 
@@ -101,7 +123,14 @@ export default function Dashboard({ initial }: { initial: AppState }) {
       <header className="topbar">
         <div className="brand">
           <h1>Ads Phase Machine</h1>
-          <span>lightschool.com · simulated Meta account</span>
+          <span>
+            lightschool.com ·{" "}
+            {state.settings.live ? (
+              <strong className="sub-live">live Meta account</strong>
+            ) : (
+              "simulated Meta account"
+            )}
+          </span>
         </div>
 
         <Link className="btn" href="/prompts">
@@ -152,30 +181,34 @@ export default function Dashboard({ initial }: { initial: AppState }) {
 
         <div className="topbar-spacer" />
 
+        {/* One primary action. "Step" runs exactly one cycle and stops, which
+            is what "generate me some ads" actually means — the continuous loop
+            is the specialist option, not the default. */}
         {m.running ? (
           <button className="btn" onClick={() => control("pause")}>
             Pause
           </button>
         ) : (
-          <button className="btn primary" onClick={() => control("start")}>
-            ▶ Run demo
+          <button
+            className="btn primary"
+            onClick={() => control("step")}
+            title={`Write, render and place ${state.settings.adsPerCycle} ads for ${campaign?.name ?? "this campaign"}`}
+          >
+            ▶ Generate ads
           </button>
         )}
-        <button className="btn" onClick={() => control("step")} disabled={m.running}>
-          Step 1 cycle
-        </button>
         <button
           className="btn"
-          onClick={() => control("warm")}
-          disabled={m.running || m.prefetch !== "none"}
-          title="Write the first batch of copy now so Run demo starts instantly"
+          onClick={() => control("start")}
+          disabled={m.running}
+          title="Keep cycling: generate, measure, evolve, repeat"
         >
-          Pre-write
+          Run loop
         </button>
         <button
           className="btn danger"
           onClick={() => {
-            if (confirm("Clear all ads and metrics? Brief and context are kept.")) {
+            if (confirm("Clear all ads and metrics? Briefs and context are kept.")) {
               control("reset");
             }
           }}
@@ -184,6 +217,85 @@ export default function Dashboard({ initial }: { initial: AppState }) {
         </button>
       </header>
 
+      {/* ------------------------------------------------- campaign switcher */}
+      {state.campaigns?.length ? (
+        <div className="campaignbar">
+          <div className="campaign-tabs">
+            {state.campaigns.map((c) => (
+              <button
+                key={c.id}
+                className={`campaign-tab ${c.id === state.settings.offerFocus ? "on" : ""}`}
+                onClick={() => setSetting({ offerFocus: c.id })}
+                disabled={m.running}
+                title={m.running ? "Pause the machine to switch campaigns" : c.audience}
+              >
+                <strong>{c.name}</strong>
+                <span>{c.audience}</span>
+              </button>
+            ))}
+          </div>
+
+          {campaign ? (
+            <div className="campaign-meta">
+              <div className="campaign-dest">
+                <span className="lbl">Sends clicks to</span>
+                {m.live?.destinations?.[campaign.id] ? (
+                  <a
+                    href={m.live.destinations[campaign.id]}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {m.live.destinations[campaign.id].replace(/^https?:\/\//, "")}
+                  </a>
+                ) : (
+                  <span className="missing">no destination set</span>
+                )}
+              </div>
+
+              <div className="campaign-dest">
+                <span className="lbl">Budget</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={campaign.dailyBudget}
+                  disabled={m.running}
+                  onChange={(e) =>
+                    post("/api/control", {
+                      action: "budget",
+                      campaign: campaign.id,
+                      dailyBudget: Number(e.target.value),
+                    })
+                  }
+                />
+                <span className="lbl">
+                  /day{" "}
+                  {state.settings.live
+                    ? `· $${state.campaigns.reduce((n, c) => n + c.dailyBudget, 0)} of $${m.live?.maxDailyUsd} total`
+                    : ""}
+                </span>
+              </div>
+
+              <div className="campaign-dest">
+                <span className="lbl">Targeting</span>
+                <span>{m.live?.geoLabel || "Lisbon 40km · PT"}</span>
+              </div>
+
+              <div className="campaign-dest">
+                <span className="lbl">On Meta</span>
+                {campaign.placement ? (
+                  <span className="ok">paused · {Object.keys(campaign.placement.adIds).length} ads placed</span>
+                ) : state.settings.live ? (
+                  <span className="missing">nothing placed yet</span>
+                ) : (
+                  <span className="missing">simulation</span>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <PhaseRail machine={m} />
 
       {/* ------------------------------------------------------------ kpis */}
@@ -191,12 +303,20 @@ export default function Dashboard({ initial }: { initial: AppState }) {
         <Kpi label="Ad spend" value={money(totals.spend, 0)} sub={`${totals.live} live ads`} />
         <Kpi label="Impressions" value={int(totals.impressions)} sub={`${int(totals.clicks)} clicks`} />
         <Kpi label="CTR" value={pct(totals.ctr)} sub={`CPC ${money(totals.cpc)}`} />
+        {/* Conversions and ROAS are only shown as numbers when something has
+            actually been measured. Against an account with no pixel they would
+            otherwise render as a confident 0 and 0.00x — a missing signal
+            dressed up as a terrible result. */}
         <Kpi
           label="Conversions"
-          value={int(totals.conversions)}
-          sub={totals.conversions ? `CPA ${money(totals.cpa)}` : "—"}
+          value={totals.tracked ? int(totals.conversions) : "—"}
+          sub={totals.tracked ? `CPA ${money(totals.cpa)}` : "no pixel"}
         />
-        <Kpi label="Revenue" value={money(totals.revenue, 0)} sub={`ROAS ${mult(totals.roas)}`} />
+        <Kpi
+          label="Revenue"
+          value={totals.tracked ? money(totals.revenue, 0) : "—"}
+          sub={totals.tracked ? `ROAS ${mult(totals.roas)}` : "ROAS unavailable"}
+        />
         <Kpi
           label="Generations"
           value={String(state.generations.length)}
@@ -209,7 +329,7 @@ export default function Dashboard({ initial }: { initial: AppState }) {
         <aside className="col left">
           <section className="panel">
             <div className="panel-head">
-              <h2>Demo controls</h2>
+              <h2>Settings</h2>
             </div>
             <div className="panel-body">
               <div className="field">
@@ -233,13 +353,13 @@ export default function Dashboard({ initial }: { initial: AppState }) {
                   className="btn sm"
                   onClick={() => setSetting({ secondsPerWindow: 6, speed: 20 })}
                 >
-                  Stage demo
+                  Fast
                 </button>
                 <button
                   className="btn sm"
                   onClick={() => setSetting({ secondsPerWindow: 6, speed: 1 })}
                 >
-                  Walkthrough
+                  Readable
                 </button>
                 <button
                   className="btn sm"
@@ -261,16 +381,9 @@ export default function Dashboard({ initial }: { initial: AppState }) {
                     onChange={(e) => setSetting({ adsPerCycle: Number(e.target.value) })}
                   />
                 </div>
-                <div className="field">
-                  <label>Daily budget</label>
-                  <input
-                    type="number"
-                    min={10}
-                    step={10}
-                    value={state.settings.dailyBudget}
-                    onChange={(e) => setSetting({ dailyBudget: Number(e.target.value) })}
-                  />
-                </div>
+                {/* Budget deliberately lives on the campaign bar, next to the
+                    destination it pays for. A second budget field here would be
+                    a second source of truth for the number that spends money. */}
                 <div className="field">
                   <label>Windows / cycle</label>
                   <input
@@ -280,6 +393,18 @@ export default function Dashboard({ initial }: { initial: AppState }) {
                     value={state.settings.windowsPerCycle}
                     onChange={(e) =>
                       setSetting({ windowsPerCycle: Number(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label>AI images / cycle</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={12}
+                    value={state.settings.aiImagesPerCycle}
+                    onChange={(e) =>
+                      setSetting({ aiImagesPerCycle: Number(e.target.value) })
                     }
                   />
                 </div>
@@ -308,6 +433,61 @@ export default function Dashboard({ initial }: { initial: AppState }) {
                 </button>
               </div>
 
+              {/*
+                Real money. This block is deliberately the loudest thing in the
+                panel, and it only appears at all when the environment has
+                already authorised live placement — there is nothing to toggle,
+                and nothing to explain away, on a fresh clone.
+              */}
+              {state.machine.live?.gateOpen ? (
+                <div className={`live-box ${state.settings.live ? "armed" : ""}`}>
+                  <div className="row">
+                    <button
+                      className={`btn sm ${state.settings.live ? "on" : ""}`}
+                      onClick={() => setSetting({ live: !state.settings.live })}
+                      disabled={!state.machine.live.ready && !state.settings.live}
+                      title={
+                        state.machine.live.ready
+                          ? "Place real ads on the connected Meta ad account"
+                          : `Not configured: missing ${state.machine.live.missing.join(", ")}`
+                      }
+                    >
+                      {state.settings.live ? "● LIVE — real ads" : "Simulation"}
+                    </button>
+                    {state.settings.live ? (
+                      <span className="live-cap">
+                        capped ${state.machine.live.maxDailyUsd}/day
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {!state.machine.live.ready ? (
+                    <div className="hint warn">
+                      Live mode needs {state.machine.live.missing.join(", ")} in
+                      .env, then a restart.
+                    </div>
+                  ) : state.settings.live ? (
+                    <div className="hint">
+                      Ads are created <strong>PAUSED</strong> on the real ad
+                      account. Nothing spends until you activate the campaign in
+                      Meta Ads Manager. Delivery is read back on a real clock, so
+                      metrics stay at zero until it is live.
+                    </div>
+                  ) : (
+                    <div className="hint">
+                      Delivery is simulated. No ad reaches Meta and no money moves.
+                    </div>
+                  )}
+
+                  {state.machine.live.lastVerify?.length ? (
+                    <div className="hint warn">
+                      Last placement did not match the plan:{" "}
+                      {state.machine.live.lastVerify.join("; ")}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="row">
                 <button
                   className={`btn sm ${state.settings.imageMode === "ai" ? "on" : ""}`}
@@ -323,8 +503,10 @@ export default function Dashboard({ initial }: { initial: AppState }) {
                 </button>
               </div>
               <div className="hint">
-                In AI mode every ad calls an image model. Generation is async —
-
+                In AI mode the first {state.settings.aiImagesPerCycle} ad
+                {state.settings.aiImagesPerCycle === 1 ? "" : "s"} of each cycle
+                call an image model; the rest keep procedural artwork.
+                Generation is async — cards fill in as images land.
               </div>
             </div>
           </section>
@@ -350,7 +532,7 @@ export default function Dashboard({ initial }: { initial: AppState }) {
 
           {visible.length === 0 ? (
             <div className="empty">
-              No ads yet. Press <strong>Run demo</strong>.
+              No ads yet. Press <strong>Generate ads</strong>.
             </div>
           ) : (
             <div className="wall">

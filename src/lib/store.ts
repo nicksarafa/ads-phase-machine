@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  CAMPAIGN_IDS,
   type AppState,
+  type Campaign,
   type ScoreRule,
   type Scorecard,
   type LogEntry,
@@ -18,17 +20,60 @@ export const REF_DIR = path.join(DATA_DIR, "refs");
 const STATE_VERSION = 1;
 
 export const DEFAULT_SETTINGS: Settings = {
+  // Simulation by default, always. Live mode additionally requires the ADS_LIVE
+  // gate in the environment, so this defaulting to false is belt to that brace.
+  live: false,
   adsPerCycle: 6,
   dailyBudget: 240,
   secondsPerWindow: 6,
   windowsPerCycle: 4,
   speed: 1,
   imageMode: "ai",
+  aiImagesPerCycle: 2,
   stepMode: false,
   killThreshold: 0.4,
   offerFocus: "team-training",
   brandLogo: true,
 };
+
+/**
+ * The workshops brief.
+ *
+ * Deliberately the opposite buyer to the team-training brief below: one person
+ * deciding for themselves, in one sitting, about a real date in their own city.
+ * Both campaigns run against the same Lisbon audience, so this copy is the only
+ * thing that distinguishes them and it has to actually be different.
+ */
+export const WORKSHOPS_BRIEF = `You are the creative strategist for Light School's Lisbon workshops on Meta.
+
+Goal: get one person in Lisbon to book a seat at an in-person workshop. They
+pay their own way and decide alone, usually in a single sitting. There is no
+procurement, no manager to convince, and no budget cycle.
+
+Write to the individual, not to a company.
+
+Write in English only.
+
+POSITIONING:
+The promise is a specific evening or afternoon in Lisbon where they build one
+real thing and walk out with it working. Local, in the room, hands on keyboards.
+Nobody else in this city is advertising that — competitors sell self-paced
+video, and video is exactly what this person has already failed to finish.
+
+Rules for every ad:
+- Lead with what they will walk out having built, not with "AI".
+- Say it is in Lisbon and in person. That is the whole edge — do not bury it.
+- Name the thing: "your first working app", "an automation that reads your
+  inbox". One concrete build beats any adjective.
+- Speak to someone who has watched a hundred tutorials and shipped nothing.
+- Primary text is 2-4 short lines. No emoji walls, no hashtag soup.
+- Headline is under 40 characters.
+- Use a different proven hook pattern for each ad in the batch, and name the
+  pattern you used in the rationale.
+- Never mention team training, companies, departments, or staff. That is the
+  other campaign and mixing them wastes both.
+- Avoid the saturated lines: "it's 2026", "Fortune 100 companies use us",
+  and anything that sounds like an AI-avatar video tool.`;
 
 export const DEFAULT_BRIEF = `You are the creative strategist for Light School's paid acquisition on Meta.
 
@@ -93,6 +138,33 @@ export function DEFAULT_SCORECARD(): Scorecard {
   };
 }
 
+/**
+ * The two campaigns, at their default split.
+ *
+ * $5 + $5 against a $10 cap: the ceiling is the *total*, so adding a second
+ * campaign divides the money rather than doubling it.
+ */
+export function DEFAULT_CAMPAIGNS(): Campaign[] {
+  return [
+    {
+      id: "workshops",
+      name: "Workshops · Lisbon",
+      audience: "One person in Lisbon booking a seat for themselves",
+      brief: WORKSHOPS_BRIEF,
+      dailyBudget: 5,
+      placement: null,
+    },
+    {
+      id: "team-training",
+      name: "Team Training · Companies",
+      audience: "A business owner or department head with a team and a budget",
+      brief: DEFAULT_BRIEF,
+      dailyBudget: 5,
+      placement: null,
+    },
+  ];
+}
+
 function emptyState(): AppState {
   return {
     version: STATE_VERSION,
@@ -105,12 +177,13 @@ function emptyState(): AppState {
       nextObserveAt: null,
       prefetch: "none",
       credentials: { anthropic: false, gemini: false, openai: false, claudeCli: false },
+      live: { gateOpen: false, ready: false, missing: [], maxDailyUsd: 0, lastVerify: null, destinations: {}, geoLabel: "" },
       llmProvider: null,
       imageProvider: null,
       lastError: null,
     },
     settings: { ...DEFAULT_SETTINGS },
-    brief: DEFAULT_BRIEF,
+    campaigns: DEFAULT_CAMPAIGNS(),
     context: [
       {
         id: "ctx-seed-0",
@@ -183,6 +256,7 @@ export function loadState(): AppState {
       const raw = JSON.parse(fs.readFileSync(STATE_FILE, "utf8")) as AppState;
       if (raw.version === STATE_VERSION) {
         slot.state = raw;
+        const prevBudget = raw.settings?.dailyBudget;
         // Backfill fields added after this state file was written. Bumping the
         // version instead would be correct but would throw away a long run's
         // worth of ads and measured insight, which is the whole demo.
@@ -191,6 +265,50 @@ export function loadState(): AppState {
         slot.state.scorecards ??= [DEFAULT_SCORECARD()];
         slot.state.drafts ??= [];
         slot.state.enabledFiles ??= ["design.md"];
+        slot.state.settings.aiImagesPerCycle ??= DEFAULT_SETTINGS.aiImagesPerCycle;
+        slot.state.settings.live ??= false;
+
+        // Migrate a single-campaign state file. Everything it held belonged to
+        // the offer this account used to sell exclusively, so the old brief,
+        // placement and ads all land on team-training rather than being split
+        // across two campaigns they were never written for.
+        const legacy = raw as unknown as {
+          brief?: string;
+          placement?: AppState["campaigns"][number]["placement"];
+        };
+        if (!Array.isArray(slot.state.campaigns) || !slot.state.campaigns.length) {
+          const fresh = DEFAULT_CAMPAIGNS();
+          const teams = fresh.find((c) => c.id === "team-training")!;
+          if (typeof legacy.brief === "string" && legacy.brief.trim()) {
+            teams.brief = legacy.brief;
+          }
+          if (legacy.placement) teams.placement = legacy.placement;
+          if (typeof prevBudget === "number" && prevBudget > 0) {
+            // The old single budget covered one campaign; halving it keeps the
+            // total unchanged rather than silently doubling the daily spend.
+            const half = Math.max(1, Math.round((prevBudget / 2) * 100) / 100);
+            for (const c of fresh) c.dailyBudget = half;
+          }
+          slot.state.campaigns = fresh;
+        }
+        for (const id of Object.keys(slot.state.ads)) {
+          slot.state.ads[id].campaign ??= "team-training";
+        }
+        if (!CAMPAIGN_IDS.includes(slot.state.settings.offerFocus)) {
+          slot.state.settings.offerFocus = "team-training";
+        }
+        slot.state.machine.live ??= {
+          gateOpen: false,
+          ready: false,
+          missing: [],
+          maxDailyUsd: 0,
+          lastVerify: null,
+          destinations: {},
+          geoLabel: "",
+        };
+        // Readiness is a fact about the current process, not about the state
+        // file, so it is always recomputed from the environment on start.
+        slot.state.machine.live.lastVerify = null;
         // A process restart always stops the loop; the UI can start it again.
         slot.state.machine.running = false;
         slot.state.machine.phase = "idle";
@@ -229,8 +347,11 @@ export function resetState(keepConfig = true) {
   const fresh = emptyState();
   if (keepConfig) {
     fresh.settings = { ...prev.settings };
-    fresh.brief = prev.brief;
     fresh.context = prev.context.map((c) => ({ ...c }));
+    // Briefs, budgets and placements all survive a soft reset. Forgetting a
+    // placement would not delete it from Meta — it would just make the next
+    // launch open a second campaign on the same budget while the first exists.
+    fresh.campaigns = prev.campaigns.map((c) => ({ ...c }));
   }
   slot.state = fresh;
   slot.loaded = true;
